@@ -1,0 +1,24 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install test dependencies
+        # Metrics tests only need the compute stack, not the API/Sheets clients.
+        run: pip install pandas numpy PyYAML python-dotenv pytest
+      - name: Run tests
+        run: python -m pytest tests/ -q
+      - name: Syntax-check all modules
+        run: python -m py_compile src/*.py src/metrics/*.py
