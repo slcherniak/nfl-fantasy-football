@@ -1,0 +1,25 @@
+[project]
+name = "league-tracker"
+version = "0.1.0"
+description = "Yahoo Fantasy API -> Python ETL -> Google Sheets for the Man Camp league: luck-adjusted standings, all-play records, power rankings, and manager-skill metrics."
+requires-python = ">=3.11"
+dependencies = [
+    "yfpy>=16.0",
+    "gspread>=6.0",
+    "google-auth>=2.0",
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "PyYAML>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["src", "src.metrics"]

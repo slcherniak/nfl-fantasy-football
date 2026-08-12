@@ -1,0 +1,52 @@
+# Weekly league update:
+#   - Tuesday run: full pull for the completed week after MNF stats post.
+#   - Thursday run: re-pull the same week to catch Yahoo stat corrections
+#     (idempotent upserts make this safe).
+# Cron is UTC. 14:00 UTC = 9am EST / 10am EDT, so the run stays after the
+# Monday-night stat post on both sides of the DST switch.
+name: weekly-update
+
+on:
+  schedule:
+    - cron: "0 14 * * 2"   # Tuesday
+    - cron: "0 14 * * 4"   # Thursday
+  workflow_dispatch:
+
+concurrency:
+  group: weekly-update
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install .
+
+      - name: Run tests (metrics bugs are silent — never publish on red)
+        run: |
+          pip install pytest
+          python -m pytest tests/ -q
+
+      - name: Update league data and publish
+        env:
+          YAHOO_CONSUMER_KEY: ${{ secrets.YAHOO_CONSUMER_KEY }}
+          YAHOO_CONSUMER_SECRET: ${{ secrets.YAHOO_CONSUMER_SECRET }}
+          # Long-lived: yfpy refreshes the access token in memory from the
+          # refresh token inside this JSON; the refresh token doesn't rotate.
+          YAHOO_ACCESS_TOKEN_JSON: ${{ secrets.YAHOO_ACCESS_TOKEN_JSON }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          LEAGUE_ID: ${{ vars.LEAGUE_ID || '392520' }}
+          SHEET_ID: ${{ secrets.SHEET_ID }}
+        # CI starts from an empty database every run, so always backfill:
+        # the full-season re-pull is idempotent and doubles as the
+        # stat-correction refresh.
+        run: python -m src.main --backfill

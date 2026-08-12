@@ -1,0 +1,17 @@
+# Secrets & tokens
+.env
+service_account.json
+auth/oauth2yahoo.json
+data/token.json
+
+# Local data store (source of truth is rebuilt from the API via --backfill)
+data/league.db
+data/*.db
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+*.egg-info/
+.venv/
+venv/
