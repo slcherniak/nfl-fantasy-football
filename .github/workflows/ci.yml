@@ -16,8 +16,9 @@ jobs:
           python-version: "3.11"
           cache: pip
       - name: Install test dependencies
-        # Metrics tests only need the compute stack, not the API/Sheets clients.
-        run: pip install pandas numpy PyYAML python-dotenv pytest
+        # Metrics + parser tests need the compute stack and the scrape
+        # parsers' deps, not the Sheets client.
+        run: pip install pandas numpy PyYAML python-dotenv requests beautifulsoup4 lxml pytest
       - name: Run tests
         run: python -m pytest tests/ -q
       - name: Syntax-check all modules
