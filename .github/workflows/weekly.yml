@@ -38,11 +38,11 @@ jobs:
 
       - name: Update league data and publish
         env:
-          YAHOO_CONSUMER_KEY: ${{ secrets.YAHOO_CONSUMER_KEY }}
-          YAHOO_CONSUMER_SECRET: ${{ secrets.YAHOO_CONSUMER_SECRET }}
-          # Long-lived: yfpy refreshes the access token in memory from the
-          # refresh token inside this JSON; the refresh token doesn't rotate.
-          YAHOO_ACCESS_TOKEN_JSON: ${{ secrets.YAHOO_ACCESS_TOKEN_JSON }}
+          # Full Cookie header from a logged-in Yahoo browser session.
+          # Yahoo sessions expire after some weeks — when the run fails with
+          # CookiesExpiredError, refresh this secret from the browser
+          # (README: 'Yahoo session cookies').
+          YAHOO_COOKIES: ${{ secrets.YAHOO_COOKIES }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
           LEAGUE_ID: ${{ vars.LEAGUE_ID || '392520' }}
           SHEET_ID: ${{ secrets.SHEET_ID }}

@@ -17,6 +17,13 @@ upserts on `(week, key)`, so re-running any week — including the Thursday
 stat-correction pass — is always safe, and `--backfill` can rebuild the
 whole season from scratch at any time.
 
+**Data source:** Yahoo denied Fantasy API access (it now requires an approved
+application at [sports.yahoo.com/developer/access](https://sports.yahoo.com/developer/access/)),
+so the default source is **scraping the league's web pages with a logged-in
+session cookie** (`src/scrape.py`). The yfpy API path (`src/fetch.py`) is
+kept behind `--source api` / `pip install .[api]` in case access is ever
+granted.
+
 ## One-time setup
 
 ### 1. Install
@@ -27,23 +34,17 @@ pip install .            # plus: pip install pytest  (to run tests)
 cp .env.example .env
 ```
 
-### 2. Yahoo OAuth (the fiddly part)
+### 2. Yahoo session cookies
 
-1. Create an app at [developer.yahoo.com](https://developer.yahoo.com/apps/)
-   → Create an App → **Installed Application**, API permission **Fantasy
-   Sports (Read)**. The redirect URI can be `oob`/localhost.
-2. Copy the Client ID / Client Secret into `.env` as `YAHOO_CONSUMER_KEY` /
-   `YAHOO_CONSUMER_SECRET`.
-3. Run the one-time browser dance:
+1. Open your league at `football.fantasysports.yahoo.com` in Chrome, logged in.
+2. Press **F12** → **Network** tab → refresh the page.
+3. Click the first request to `football.fantasysports.yahoo.com` →
+   **Headers** → **Request Headers** → copy the entire `Cookie:` value.
+4. Paste it into `.env` as `YAHOO_COOKIES=...` (one line).
 
-   ```bash
-   python -m src.main --auth-only
-   ```
-
-   Follow the printed URL, approve, paste the code back. yfpy writes
-   `YAHOO_ACCESS_TOKEN_JSON` into `.env` and refreshes it automatically on
-   every future run (access tokens only live ~1 hour; the refresh token is
-   long-lived).
+Yahoo sessions eventually expire (typically after weeks). When a run fails
+with `CookiesExpiredError`, repeat these steps and update the `YAHOO_COOKIES`
+value (locally in `.env`, in CI the GitHub secret).
 
 ### 3. Google Sheets service account
 
@@ -62,8 +63,9 @@ python -m src.main --backfill        # pull every completed week, compute, publi
 ```
 
 Useful flags: `--week 6` (re-pull one week), `--skip-rosters` (matchup-level
-only, far fewer API calls), `--skip-publish` (compute without touching the
-sheet), `--skip-fetch` (recompute/publish from the existing database).
+only, far fewer page loads), `--skip-publish` (compute without touching the
+sheet), `--skip-fetch` (recompute/publish from the existing database),
+`--source api` (yfpy path, requires approved API access).
 
 ## GitHub Actions (weekly automation)
 
@@ -75,14 +77,13 @@ Repository secrets to set:
 
 | Secret | Value |
 |---|---|
-| `YAHOO_CONSUMER_KEY` / `YAHOO_CONSUMER_SECRET` | from your Yahoo app |
-| `YAHOO_ACCESS_TOKEN_JSON` | the JSON value yfpy wrote into your local `.env` |
+| `YAHOO_COOKIES` | the full Cookie header from a logged-in Yahoo browser session (step 2 above) |
 | `GOOGLE_SERVICE_ACCOUNT_JSON` | full contents of `service_account.json` |
 | `SHEET_ID` | the spreadsheet ID |
 
-The Yahoo refresh token inside `YAHOO_ACCESS_TOKEN_JSON` does not rotate, so
-the secret keeps working season-long. CI runs the test suite first and never
-publishes on red.
+When Yahoo cookies expire, the run fails loudly with `CookiesExpiredError` —
+refresh the `YAHOO_COOKIES` secret and re-run. CI runs the test suite first
+and never publishes on red.
 
 ## The sheet
 

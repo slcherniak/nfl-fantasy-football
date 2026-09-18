@@ -25,17 +25,24 @@ layer only*. All metrics are computed in Python against a local SQLite store,
 then written to Sheets as values — no formulas that depend on raw tabs.
 
 ```
-Yahoo Fantasy API
-      │  (yfpy, OAuth2)                          src/auth.py, src/fetch.py
+Yahoo league web pages (session cookies)         src/scrape.py  ← DEFAULT
+  [or Yahoo Fantasy API via yfpy, --source api]  src/auth.py, src/fetch.py
       ▼
 SQLite: data/league.db  ← source of truth        src/models.py
-      │
       ▼
 Metrics engine (pandas)                          src/metrics/*, src/simulate.py
-      │
       ▼
 Google Sheets (gspread, service account)         src/report.py, src/publish.py
 ```
+
+**Data source:** Yahoo denied Fantasy API access (now application-gated at
+sports.yahoo.com/developer/access), so scraping is the default. The scraper
+authenticates with a browser session cookie (`YAHOO_COOKIES`) and parses:
+league home ("Week N Matchups" → current week), `#matchupweek` list items
+(matchup scores/ids), `/teams` (managers, FAAB remaining), and per-team
+`?week=N` stat tables (`td.pos` / `td.player` / `td.pts`). Weeks before the
+current week count as complete. The yfpy path stays behind `--source api` +
+`pip install .[api]`.
 
 **Runner:** GitHub Actions (`.github/workflows/weekly.yml`) — Tue + Thu
 14:00 UTC (9am EST / 10am EDT), plus `workflow_dispatch`. CI always runs
@@ -46,8 +53,9 @@ idempotent and doubles as the Thursday stat-correction refresh.
 
 | Path | Responsibility |
 |---|---|
-| `src/auth.py` | Yahoo OAuth via yfpy; token persisted/refreshed through `.env` |
-| `src/fetch.py` | API pulls → idempotent upserts keyed on (week, key) |
+| `src/scrape.py` | **default fetch layer**: cookie-auth page scraping → same tables |
+| `src/auth.py` | Yahoo OAuth via yfpy (API mode only) |
+| `src/fetch.py` | yfpy API pulls (API mode only) → idempotent upserts keyed on (week, key) |
 | `src/models.py` | SQLite schema + upsert helpers |
 | `src/load.py` | SQLite → DataFrames |
 | `src/metrics/` | all_play, luck, power_rankings, efficiency, volatility, sos, awards |
@@ -89,25 +97,36 @@ raises if asked to write an unowned tab.
 
 ## Known gotchas (encoded, don't regress them)
 
-1. **Yahoo OAuth is the #1 failure mode.** Access tokens expire in ~1 hour;
-   the refresh token in `YAHOO_ACCESS_TOKEN_JSON` is what keeps CI alive and
-   does not rotate. Locally yfpy writes the refreshed token back to `.env`.
-2. **Stat corrections** land Wed/Thu — hence the Thursday re-run; safety
+1. **Cookie expiry is the #1 failure mode.** Yahoo sessions last weeks, not
+   forever. Every scrape checks for a login redirect and raises
+   `CookiesExpiredError` with refresh instructions instead of storing junk.
+   The fix is always: re-copy the browser Cookie header into the
+   `YAHOO_COOKIES` secret.
+2. **Yahoo can redesign pages.** All DOM anchors live in `src/scrape.py`
+   parsers with fixture-pinned tests in `tests/test_scrape.py` — a redesign
+   breaks tests loudly before it corrupts data.
+3. **Stat corrections** land Wed/Thu — hence the Thursday re-run; safety
    comes from upserts on (week, key), never inserts.
-3. **Game keys are season-scoped** (`461.l.392520`-style). Fetched at
-   runtime; never hardcode a game key or season.
-4. **Rate limits:** roster pulls sleep between calls
-   (`fetch.ROSTER_CALL_SLEEP_SECONDS`).
+4. **Scrape politely.** One page per second (`scrape.PAGE_SLEEP_SECONDS`);
+   a weekly run is ~30 pages.
 5. **Sheets quota:** one batched values write per tab, never cell loops.
 6. **Ties exist** — result ∈ {W, L, T} everywhere; all-play ties are 0.5.
 7. **Test the metrics.** `tests/test_metrics.py` asserts exact hand-computed
    values on a fixture league; CI refuses to publish if tests fail. Any new
    metric needs fixture-exact tests before it ships.
+8. **Playoff-week placeholders:** weeks 15–17 show TBD matchups until seeds
+   are set; the parser skips list items without two team links.
+
+## Confirmed at runtime (Sept 2026)
+
+- Team count: **12** (matches config)
+- FAAB budget: **$100** (remaining balances scraped from /teams into
+  `league_meta.faab_remaining`)
 
 ## Remaining open questions
 
-- [ ] Actual team count (verify at runtime; loud log if ≠ 12)
-- [ ] FAAB budget (auto-detect from API)
 - [ ] Share sheet read-only with the league, or private?
-- [ ] FAAB spend-efficiency (points added per FAAB dollar) — transactions are
-      stored; the metric itself is not yet built
+- [ ] FAAB spend-efficiency (points added per FAAB dollar) — needs a
+      transactions scraper (`/f1/<id>/transactions`); not yet built
+- [ ] Yahoo Fantasy API application (if ever approved, switch back with
+      `--source api`)
