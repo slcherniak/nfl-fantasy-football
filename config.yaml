@@ -1,0 +1,67 @@
+# League Tracker configuration — Man Camp
+#
+# Anything Yahoo can tell us at runtime (team count, FAAB budget, current week,
+# game key) is auto-detected and NOT set here. Values here are either
+# presentation/tuning knobs or expectations we verify loudly against the API.
+
+league:
+  league_id: "392520"
+  game_code: "nfl"
+  # Expectation only — the script always uses the API's num_teams. If the
+  # actual count differs from this, the run logs a loud warning (settings
+  # allow up to 14).
+  expected_num_teams: 12
+
+playoffs:
+  num_playoff_teams: 6
+  num_byes: 2               # top 2 seeds skip the first playoff week
+  weeks: [15, 16, 17]       # week 15 = quarterfinals (seeds 3-6), 16 = semis, 17 = final
+  reseeding: false
+
+regular_season:
+  weeks: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]
+
+# Power ranking composite: z-score each component across the league, blend by
+# these weights, rank by the blend. Weights should sum to 1.0 (they are
+# renormalized defensively if not).
+power_rankings:
+  weights:
+    season_ppg: 0.35
+    recent_ppg: 0.25        # last-3-weeks PPG
+    all_play_pct: 0.25
+    win_pct: 0.15
+  recent_weeks: 3
+
+luck:
+  close_game_margin: 10.0   # games decided by fewer than this many points
+
+# Lineup slots for the optimal-lineup calculation. FLEX eligibility is the
+# listed position set. Bench/IR slots are excluded from "actual" points.
+roster_slots:
+  QB: 1
+  RB: 2
+  WR: 2
+  TE: 1
+  "W/R/T": 1
+  K: 1
+  DEF: 1
+flex_eligibility:
+  "W/R/T": ["WR", "RB", "TE"]
+non_starting_slots: ["BN", "IR", "IR+"]
+
+simulation:
+  num_sims: 10000
+  random_seed: null          # set an int for reproducible odds
+
+sheets:
+  # The script owns exactly these tabs and fully rewrites them every run.
+  # It never touches any other tab, so manual tabs (notes, side bets) are safe.
+  tabs:
+    dashboard: "Dashboard"
+    all_play_matrix: "All-Play Matrix"
+    luck_report: "Luck Report"
+    efficiency: "Manager Efficiency"
+    weekly_log: "Weekly Log"
+    trends: "Trends"
+    raw_matchups: "_raw_matchups"
+    raw_standings: "_raw_standings"

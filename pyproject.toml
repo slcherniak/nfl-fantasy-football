@@ -1,0 +1,33 @@
+[project]
+name = "league-tracker"
+version = "0.1.0"
+description = "Yahoo Fantasy API -> Python ETL -> Google Sheets for the Man Camp league: luck-adjusted standings, all-play records, power rankings, and manager-skill metrics."
+requires-python = ">=3.11"
+dependencies = [
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "lxml>=5.0",
+    "gspread>=6.0",
+    "google-auth>=2.0",
+    "pandas>=2.0",
+    "numpy>=1.26",
+    "PyYAML>=6.0",
+    "python-dotenv>=1.0",
+]
+
+[project.optional-dependencies]
+# The yfpy API path (src/auth.py, src/fetch.py) needs approved Yahoo Fantasy
+# API access, which was denied — scraping is the default source. Install with
+# `pip install .[api]` if access is ever granted.
+api = [
+    "yfpy>=16.0",
+]
+dev = [
+    "pytest>=8.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["src", "src.metrics"]
