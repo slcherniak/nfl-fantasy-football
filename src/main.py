@@ -141,7 +141,12 @@ def run(argv: list[str] | None = None) -> int:
     if not sheet_id:
         logger.error("SHEET_ID is not set — set it in .env or pass --skip-publish")
         return 1
-    publish_tables(sheet_id, tables, owned_tabs=set(settings.sheet_tabs.values()))
+    publish_tables(
+        sheet_id,
+        tables,
+        owned_tabs=set(settings.sheet_tabs.values()),
+        charts_tab_names=settings.sheet_tabs,
+    )
     logger.info("Publish complete")
     return 0
 

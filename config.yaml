@@ -58,6 +58,7 @@ sheets:
   # It never touches any other tab, so manual tabs (notes, side bets) are safe.
   tabs:
     dashboard: "Dashboard"
+    charts: "Charts"
     all_play_matrix: "All-Play Matrix"
     luck_report: "Luck Report"
     efficiency: "Manager Efficiency"
