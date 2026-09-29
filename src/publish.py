@@ -50,9 +50,11 @@ def publish_tables(
     sheet_id: str,
     tables: dict[str, pd.DataFrame | list[list[Any]]],
     owned_tabs: set[str],
+    charts_tab_names: dict[str, str] | None = None,
 ) -> None:
     """Rewrite each named tab with its table. Creates missing tabs; refuses
-    to write anywhere outside owned_tabs."""
+    to write anywhere outside owned_tabs. When charts_tab_names is given,
+    native charts on the charts tab are recreated after the values land."""
     client = get_client()
     spreadsheet = client.open_by_key(sheet_id)
     existing = {ws.title: ws for ws in spreadsheet.worksheets()}
@@ -78,3 +80,27 @@ def publish_tables(
             except Exception:  # older gspread or already hidden
                 logger.debug("Could not hide tab %s", tab_name)
         logger.info("Published %d rows to tab %r", len(values), tab_name)
+
+    if charts_tab_names:
+        _refresh_charts(spreadsheet, existing, tables, charts_tab_names, owned_tabs)
+
+
+def _refresh_charts(
+    spreadsheet: gspread.Spreadsheet,
+    existing: dict[str, gspread.Worksheet],
+    tables: dict[str, Any],
+    tab_names: dict[str, str],
+    owned_tabs: set[str],
+) -> None:
+    from src.charts import build_chart_requests
+
+    charts_tab = tab_names["charts"]
+    if charts_tab not in owned_tabs:
+        raise ValueError(f"Charts tab {charts_tab!r} is not in the owned tab list")
+    if charts_tab not in existing:
+        existing[charts_tab] = spreadsheet.add_worksheet(title=charts_tab, rows=120, cols=26)
+    metadata = spreadsheet.fetch_sheet_metadata()
+    requests = build_chart_requests(metadata, tables, tab_names)
+    if requests:
+        spreadsheet.batch_update({"requests": requests})
+    logger.info("Refreshed charts on tab %r", charts_tab)

@@ -61,6 +61,7 @@ idempotent and doubles as the Thursday stat-correction refresh.
 | `src/metrics/` | all_play, luck, power_rankings, efficiency, volatility, sos, awards |
 | `src/simulate.py` | Monte Carlo playoff odds (fixed 6-team bracket, no reseed) |
 | `src/report.py` | metric outputs → presentation tables per tab |
+| `src/charts.py` | native Sheets chart specs for the Charts tab (validated palette) |
 | `src/publish.py` | batched value writes; only touches tabs listed in config |
 | `src/main.py` | orchestrator: fetch → compute → publish; `--backfill`, `--week N`, `--skip-*` |
 | `tests/` | exact-value metric tests on a hand-computed 4-team fixture |
@@ -90,10 +91,16 @@ idempotent and doubles as the Thursday stat-correction refresh.
 
 ## Sheet tabs (owned by the script, fully rewritten each run)
 
-Dashboard, All-Play Matrix, Luck Report, Manager Efficiency, Weekly Log,
-Trends, `_raw_matchups`, `_raw_standings` (hidden). **Never write to any
+Dashboard, Charts, All-Play Matrix, Luck Report, Manager Efficiency, Weekly
+Log, Trends, `_raw_matchups`, `_raw_standings` (hidden). **Never write to any
 other tab** — manual tabs (notes, side bets) must survive. `publish.py`
 raises if asked to write an unowned tab.
+
+The Charts tab holds native Sheets charts (`src/charts.py`), recreated
+idempotently each publish and anchored to the value tabs, so they refresh
+with the data. Team line colors come from a 12-slot palette validated with
+the dataviz checker and are assigned by stable team order (a team keeps its
+color all season).
 
 ## Known gotchas (encoded, don't regress them)
 

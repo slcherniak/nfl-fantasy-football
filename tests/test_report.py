@@ -28,7 +28,8 @@ def settings():
         "non_starting_slots": ["BN", "IR"],
         "simulation": {"num_sims": 25, "random_seed": 1},
         "sheets": {"tabs": {
-            "dashboard": "Dashboard", "all_play_matrix": "All-Play Matrix",
+            "dashboard": "Dashboard", "charts": "Charts",
+            "all_play_matrix": "All-Play Matrix",
             "luck_report": "Luck Report", "efficiency": "Manager Efficiency",
             "weekly_log": "Weekly Log", "trends": "Trends",
             "raw_matchups": "_raw_matchups", "raw_standings": "_raw_standings",
@@ -65,7 +66,7 @@ def conn(tmp_path):
 
 def test_build_tables_smoke(conn, settings):
     tables = report.build_tables(conn, settings)
-    expected_tabs = set(settings.sheet_tabs.values())
+    expected_tabs = set(settings.sheet_tabs.values()) - {"Charts"}  # charts tab holds objects, not values
     assert set(tables.keys()) == expected_tabs
 
     dash = tables["Dashboard"]
