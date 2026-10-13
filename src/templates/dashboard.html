@@ -108,9 +108,9 @@ svg text{font-family:var(--body)}
     <div class="chart-card"><div class="scrollwrap"><svg id="mgrQuad"></svg></div></div>
   </div>
   <div>
-    <div class="sec-head"><h2>Boom or Bust</h2></div>
-    <p class="sec-sub">Scoring average against week-to-week volatility. High scorers who swing hard are live playoff underdogs; steady ones are safe but capped.</p>
-    <div class="chart-card"><div class="scrollwrap"><svg id="volQuad"></svg></div></div>
+    <div class="sec-head"><h2>Floors and Ceilings</h2></div>
+    <p class="sec-sub">Worst week against best week. A high floor steals wins on off weeks; a high ceiling wins playoff games. Low floor with a high ceiling is the true boom-or-bust profile.</p>
+    <div class="chart-card"><div class="scrollwrap"><svg id="rangeQuad"></svg></div></div>
   </div>
 </section>
 
@@ -279,10 +279,11 @@ if(DATA.mgrQuad.length) scatter("mgrQuad", DATA.mgrQuad, {
   medianY:true,
   quadLabels:{tl:"Squeezing a thin roster", tr:"Stacked and sharp", bl:"Rough all around", br:"Stacked but sloppy"}
 });
-scatter("volQuad", DATA.volQuad, {
-  xLabel:"Points per game", yLabel:"Week-to-week volatility (σ)", xFmt:f1, yFmt:f1,
+scatter("rangeQuad", DATA.rangeQuad, {
+  xLabel:"Floor (worst week)", yLabel:"Ceiling (best week)", xFmt:f1, yFmt:f1,
   medianY:true,
-  quadLabels:{tl:"Chaos, no ceiling", tr:"Boom or bust", bl:"Reliably mid", br:"Steady juggernaut"}
+  quadLabels:{tl:"Boom or bust", tr:"Juggernaut", bl:"Rough all around", br:"Steady but capped"},
+  extra:p=>`<br>Season PPG: ${f1(p.ppg)}`
 });
 
 /* ---- scoring distribution strips ---- */

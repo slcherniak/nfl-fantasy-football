@@ -126,9 +126,16 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
                     "y": round(float(eff_season.loc[k, "efficiency"]) * 100, 1)})
         for k in teams["team_key"]
     ] if eff_season is not None else []
-    vol_quad = [
-        _round_map({"key": k, "x": round(float(vol.loc[k, "ppg"]), 1),
-                    "y": round(float(vol.loc[k, "std_dev"]), 1)})
+    # Floor vs ceiling: worst and best week, with PPG for the tooltip.
+    # Raw sigma mislabels high-floor teams as boom/bust (upside variance is
+    # not risk); min/max separates downside from upside honestly.
+    per_team_scores = matchups.groupby("team_key")["points_for"]
+    lo_hi = per_team_scores.agg(["min", "max"])
+    range_quad = [
+        _round_map({"key": k,
+                    "x": round(float(lo_hi.loc[k, "min"]), 1),
+                    "y": round(float(lo_hi.loc[k, "max"]), 1),
+                    "ppg": round(float(vol.loc[k, "ppg"]), 1)})
         for k in teams["team_key"]
     ]
 
@@ -190,7 +197,7 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
         "standings": standings,
         "luckQuad": luck_quad,
         "mgrQuad": mgr_quad,
-        "volQuad": vol_quad,
+        "rangeQuad": range_quad,
         "weekly": {"weeks": [int(w) for w in weeks], "scores": weekly_scores, "median": medians},
         "oddsRace": {"weeks": race_weeks, "odds": race},
         "allPlay": {"order": order, "cells": cells},
