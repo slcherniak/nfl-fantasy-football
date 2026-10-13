@@ -232,13 +232,35 @@ function scatter(id, pts, opt){
   if(q.tr)S("text",{x:W-M.r-8,y:M.t+16,"text-anchor":"end",class:"quad-lbl",text:q.tr},svg);
   if(q.bl)S("text",{x:M.l+8,y:H-M.b-10,class:"quad-lbl",text:q.bl},svg);
   if(q.br)S("text",{x:W-M.r-8,y:H-M.b-10,"text-anchor":"end",class:"quad-lbl",text:q.br},svg);
-  /* points + collision-nudged labels */
-  const labeled=pts.map(p=>({p,lx:X(p.x)+11,ly:Y(p.y)+4,anchor:"start"}));
-  for(const l of labeled){ if(l.lx>W-M.r-4){ l.lx=X(l.p.x)-11; l.anchor="end"; } }
-  labeled.sort((a,b)=>a.ly-b.ly);
-  for(let i=1;i<labeled.length;i++){
-    const a=labeled[i-1],b=labeled[i];
-    if(b.anchor===a.anchor && Math.abs(b.ly-a.ly)<16 && Math.abs(a.lx-b.lx)<170) b.ly=a.ly+16;
+  /* points + collision-avoiding labels: try candidate offsets around each
+     dot, rejecting any that overlaps a placed label, a dot, or the edges */
+  const CH=6.9, LH=14;
+  const boxes=pts.map(p=>({x:X(p.x)-9,y:Y(p.y)-9,w:18,h:18}));  // dot hit-boxes
+  const hit=(a,b)=>a.x<b.x+b.w && b.x<a.x+a.w && a.y<b.y+b.h && b.y<a.y+a.h;
+  const placed=[];
+  function labelBox(px,py,dx,dy,anchor,w){
+    const lx=px+dx, ly=py+dy;
+    const bx=anchor==="start"?lx:anchor==="end"?lx-w:lx-w/2;
+    return {lx,ly,anchor,box:{x:bx,y:ly-11,w,h:LH}};
+  }
+  const CANDS=[[11,4,"start"],[-11,4,"end"],[0,-13,"middle"],[0,19,"middle"],
+               [11,-10,"start"],[11,18,"start"],[-11,-10,"end"],[-11,18,"end"],
+               [11,32,"start"],[-11,32,"end"]];
+  const labeled=[];
+  const order=[...pts].sort((a,b)=>Y(a.y)-Y(b.y));
+  for(const p of order){
+    const w=short(p.key).length*CH, px=X(p.x), py=Y(p.y);
+    let pick=null;
+    for(const [dx,dy,an] of CANDS){
+      const c=labelBox(px,py,dx,dy,an,w);
+      if(c.box.x<2||c.box.x+c.box.w>W-2||c.box.y<M.t-18||c.box.y+c.box.h>H-M.b+22) continue;
+      if(placed.some(b=>hit(c.box,b))||boxes.some(b=>hit(c.box,b))) continue;
+      pick=c; break;
+    }
+    if(!pick){ pick=labelBox(px,py,11,4,"start",w);
+      while(placed.some(b=>hit(pick.box,b))) { pick.ly+=14; pick.box.y+=14; } }
+    placed.push(pick.box);
+    labeled.push({p,...pick});
   }
   for(const {p} of labeled){
     const c=S("circle",{cx:X(p.x),cy:Y(p.y),r:7,css:`fill:${cv(p.key)}`,stroke:"var(--surface)","stroke-width":2},svg);
