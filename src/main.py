@@ -70,6 +70,7 @@ def _fetch_scrape(args, settings, conn) -> None:
             roster_weeks = [w for w in (current_week - 2, current_week - 1) if w >= 1]
         for week in roster_weeks:
             scrape.fetch_rosters_for_week(scraper, conn, week)
+        scrape.fetch_transactions(scraper, conn)
 
     from src import fetch as fetch_common
     for week in completed:
