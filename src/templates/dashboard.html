@@ -1,0 +1,505 @@
+<title>Man Camp Film Room</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap">
+<style>
+/* Layout: one centered column of chart cards; quadrants pair up at desktop.
+   Scoreboard-meets-film-room: condensed display type, tabular data ink. */
+:root{
+  --bg:#f7f6f3; --surface:#fcfcfb; --ink:#1c1b18; --ink-2:#52514e; --muted:#8a887f;
+  --grid:#e4e2db; --line:#d4d2c9; --accent:#2a78d6; --accent-ink:#1b5cab;
+  --good:#1a7f37; --bad:#c23b3b;
+  --display:"Barlow Condensed",system-ui,sans-serif;
+  --body:"Source Sans 3",system-ui,sans-serif;
+  --t1:#2a78d6;--t2:#eb6834;--t3:#1baf7a;--t4:#9c5b21;--t5:#e87ba4;--t6:#4a3aa7;
+  --t7:#eda100;--t8:#00879e;--t9:#e34948;--t10:#008300;--t11:#b04fc4;--t12:#77820a;
+  --heat0:#f1efe9;--heat1:#d7e3f4;--heat2:#b1cdec;--heat3:#83b0e2;--heat4:#5493da;--heat5:#2a78d6;--heat6:#1b5cab;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#141413; --surface:#1d1d1b; --ink:#f2f1ec; --ink-2:#c3c2b7; --muted:#8f8d83;
+    --grid:#2e2d2a; --line:#3a3936; --accent:#3987e5; --accent-ink:#6ca6ec;
+    --good:#4bbf6b; --bad:#e66767;
+    --t1:#3987e5;--t2:#d95926;--t3:#199e70;--t4:#b5793f;--t5:#d55181;--t6:#9085e9;
+    --t7:#c98500;--t8:#00a7c0;--t9:#e66767;--t10:#008300;--t11:#c46ad6;--t12:#849016;
+    --heat0:#232320;--heat1:#203a57;--heat2:#28507e;--heat3:#3167a4;--heat4:#3987e5;--heat5:#6ca6ec;--heat6:#a3c8f3;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#141413; --surface:#1d1d1b; --ink:#f2f1ec; --ink-2:#c3c2b7; --muted:#8f8d83;
+  --grid:#2e2d2a; --line:#3a3936; --accent:#3987e5; --accent-ink:#6ca6ec;
+  --good:#4bbf6b; --bad:#e66767;
+  --t1:#3987e5;--t2:#d95926;--t3:#199e70;--t4:#b5793f;--t5:#d55181;--t6:#9085e9;
+  --t7:#c98500;--t8:#00a7c0;--t9:#e66767;--t10:#008300;--t11:#c46ad6;--t12:#849016;
+  --heat0:#232320;--heat1:#203a57;--heat2:#28507e;--heat3:#3167a4;--heat4:#3987e5;--heat5:#6ca6ec;--heat6:#a3c8f3;
+  color-scheme:dark;
+}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);line-height:1.5;margin:0}
+.wrap{max-width:1060px;margin:0 auto;padding-block:28px 56px;padding-inline:20px}
+header.masthead{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px;border-bottom:3px solid var(--ink);padding-bottom:10px;margin-bottom:10px}
+.eyebrow{font-family:var(--display);font-weight:600;letter-spacing:.14em;text-transform:uppercase;font-size:14px;color:var(--ink-2)}
+h1{font-family:var(--display);font-weight:700;font-size:clamp(40px,7vw,58px);line-height:.95;margin:0;text-wrap:balance;text-transform:uppercase;letter-spacing:.01em}
+.subline{color:var(--ink-2);font-size:15px;margin:0 0 26px}
+h2{font-family:var(--display);font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:.04em;margin:0}
+section{margin-top:40px}
+.sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:4px}
+.sec-sub{color:var(--ink-2);font-size:14.5px;margin:0 0 14px;max-width:68ch}
+.cardgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:22px 0 6px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.tile .lbl{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.tile .num{font-family:var(--display);font-weight:700;font-size:34px;line-height:1.05;font-variant-numeric:tabular-nums}
+.tile .who{font-size:13.5px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin:14px 0 4px}
+.legend span{display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--ink-2)}
+.dot{width:10px;height:10px;border-radius:50%;flex:none}
+.chart-card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 10px 6px}
+.scrollwrap{overflow-x:auto}
+.scrollwrap svg{display:block;min-width:620px;width:100%;height:auto}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:860px){.duo{grid-template-columns:1fr}}
+.tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
+table{border-collapse:collapse;width:100%;font-size:14px;min-width:640px}
+th{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.08em;font-size:12.5px;color:var(--muted);text-align:right;padding:10px 10px 6px;border-bottom:2px solid var(--grid)}
+th.l,td.l{text-align:left}
+td{padding:7px 10px;border-bottom:1px solid var(--grid);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr:last-child td{border-bottom:none}
+td .dot{display:inline-block;margin-right:7px;vertical-align:1px}
+.pos{color:var(--good);font-weight:600}.neg{color:var(--bad);font-weight:600}
+.mult-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+@media(max-width:860px){.mult-grid{grid-template-columns:repeat(2,1fr)}}
+.mini{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 8px 2px;min-width:0}
+.mini .nm{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.mini svg{width:100%;height:auto;display:block}
+.sub-h{font-family:var(--display);font-weight:600;font-size:18px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;color:var(--ink-2)}
+.trades{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.trade{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.trade .hdr{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
+.trade .side{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--grid)}
+.trade .side:first-of-type{border-top:none}
+.trade .tm{font-weight:700;font-size:13.5px}
+.trade .pl{font-size:12.5px;color:var(--ink-2)}
+.trade .tot{font-family:var(--display);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums;white-space:nowrap}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;line-height:1.35;padding:7px 10px;border-radius:5px;max-width:260px;z-index:10;opacity:0;transition:opacity .08s}
+footer{margin-top:48px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:13px}
+svg text{font-family:var(--body)}
+.axis-t{fill:var(--muted);font-size:12.5px}
+.axis-lbl{fill:var(--ink-2);font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase}
+.quad-lbl{fill:var(--muted);font-size:12.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
+.pt-lbl{fill:var(--ink);font-size:13.5px;font-weight:600}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+
+<div class="wrap">
+<header class="masthead">
+  <span class="eyebrow">Man Camp &middot; 2026 Season</span>
+  <h1>The Film Room</h1>
+</header>
+<p class="subline" id="subline"></p>
+
+<div class="cardgrid" id="tiles"></div>
+<div class="legend" id="legend"></div>
+
+<section>
+  <div class="sec-head"><h2>Standings, Adjusted for Reality</h2></div>
+  <p class="sec-sub">Record is what the schedule gave you. Luck is actual wins minus the wins your scores earned against the whole league (all-play). Odds come from 10,000 simulated season endings.</p>
+  <div class="tablewrap"><table id="standings"></table></div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>The Luck Quadrant</h2></div>
+  <p class="sec-sub">Expected wins (from all-play scoring) against actual wins. On the diagonal, the standings tell the truth. Above it, the schedule has been kind; below it, you've been robbed.</p>
+  <div class="chart-card"><div class="scrollwrap"><svg id="luckQuad"></svg></div></div>
+</section>
+
+<section class="duo">
+  <div>
+    <div class="sec-head"><h2>Rosters vs Managers</h2></div>
+    <p class="sec-sub">Best possible points per week (roster strength) against the share of it the lineup actually captured. Right side drafted well; top edge sets the lineup well.</p>
+    <div class="chart-card"><div class="scrollwrap"><svg id="mgrQuad"></svg></div></div>
+  </div>
+  <div>
+    <div class="sec-head"><h2>Floors and Ceilings</h2></div>
+    <p class="sec-sub">Worst week against best week. A high floor steals wins on off weeks; a high ceiling wins playoff games. Low floor with a high ceiling is the true boom-or-bust profile.</p>
+    <div class="chart-card"><div class="scrollwrap"><svg id="rangeQuad"></svg></div></div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>Scoring Distributions</h2></div>
+  <p class="sec-sub">Every week each team has played, one dot per game. The bar spans their floor to their ceiling; the notch is their median. The dashed line is the league median.</p>
+  <div class="chart-card"><div class="scrollwrap"><svg id="strips"></svg></div></div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>The Playoff Odds Race</h2></div>
+  <p class="sec-sub">Playoff probability recomputed after every completed week, each time simulating the rest of the season 3,000 times from that point's records and scoring profiles.</p>
+  <div class="chart-card"><div class="scrollwrap"><svg id="race"></svg></div></div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>Week-by-Week Trajectories</h2></div>
+  <p class="sec-sub">Each team against the league median (dashed). Same scale everywhere, so shapes compare honestly.</p>
+  <div class="mult-grid" id="multiples"></div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>The Transaction Desk</h2></div>
+  <p class="sec-sub">Every move graded by what the player actually scored <em>in the lineup</em> after it — points rotting on the bench don't count. Re-graded automatically each week.</p>
+  <div class="duo">
+    <div>
+      <h3 class="sub-h">Best pickups of the season</h3>
+      <div class="chart-card"><div class="scrollwrap"><svg id="pickups"></svg></div></div>
+    </div>
+    <div>
+      <h3 class="sub-h">The FAAB market</h3>
+      <div class="chart-card"><div class="scrollwrap"><svg id="faab"></svg></div></div>
+      <h3 class="sub-h" style="margin-top:14px">FAAB efficiency</h3>
+      <div class="chart-card"><div class="scrollwrap"><svg id="faabRoi"></svg></div></div>
+    </div>
+  </div>
+  <h3 class="sub-h" style="margin-top:18px">Trade scoreboard</h3>
+  <div id="trades" class="trades"></div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>All-Play Domination Grid</h2></div>
+  <p class="sec-sub">Row team's weekly-score record against each column team across every week, even when they never met. Darker means more dominant. Teams ordered by all-play wins.</p>
+  <div class="chart-card"><div class="scrollwrap"><svg id="heat"></svg></div></div>
+</section>
+
+<footer id="foot"></footer>
+</div>
+<div id="tip" role="status"></div>
+
+<script>
+const DATA = /*__DATA__*/null;
+const teams = {}; DATA.teams.forEach((t,i)=>{ t.var = `var(--t${i+1})`; t.idx=i; teams[t.key]=t; });
+const nm = k => teams[k].name, cv = k => teams[k].var;
+const short = k => { const n = nm(k); return n.length>16 ? n.slice(0,15).trimEnd()+"…" : n; };
+const f1 = x => (Math.round(x*10)/10).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1});
+const pct = x => Math.round(x*100)+"%";
+const NS = "http://www.w3.org/2000/svg";
+function S(tag, attrs, parent){ const e=document.createElementNS(NS,tag);
+  for(const[k,v] of Object.entries(attrs||{})){ if(k==="text"){e.textContent=v;} else if(k==="css"){e.style.cssText=v;} else e.setAttribute(k,v);}
+  if(parent) parent.appendChild(e); return e; }
+
+/* tooltip */
+const tip = document.getElementById("tip");
+function hover(el, html){
+  el.addEventListener("pointerenter", e=>{ tip.innerHTML=html; tip.style.opacity=1; });
+  el.addEventListener("pointermove", e=>{
+    const w=tip.offsetWidth, x=Math.min(e.clientX+14, innerWidth-w-8);
+    tip.style.left=x+"px"; tip.style.top=(e.clientY+16)+"px"; });
+  el.addEventListener("pointerleave", ()=>{ tip.style.opacity=0; });
+}
+
+/* header, tiles, legend, footer */
+document.getElementById("subline").textContent =
+  `Luck-adjusted standings, manager skill, and playoff math for a 12-team league · through Week ${DATA.asOfWeek}`;
+const tileBox = document.getElementById("tiles");
+for(const t of Object.values(DATA.tiles)){
+  const d=document.createElement("div"); d.className="tile";
+  const who = t.who ? `${t.who} · ${nm(t.key)}` : nm(t.key);
+  d.innerHTML=`<div class="lbl">${t.label} · Wk ${DATA.asOfWeek}</div>
+    <div class="num">${f1(t.points)}</div>
+    <div class="who"><span class="dot" style="background:${cv(t.key)}"></span>${who}</div>`;
+  tileBox.appendChild(d);
+}
+const leg = document.getElementById("legend");
+DATA.teams.forEach(t=>{ const s=document.createElement("span");
+  s.innerHTML=`<span class="dot" style="background:${t.var}"></span>${t.name}`; leg.appendChild(s); });
+document.getElementById("foot").textContent =
+  `Generated ${DATA.generated} from Yahoo league data · all-play counts every weekly score against all 11 opponents · odds are Monte Carlo (10k sims, normal scoring model), top ${DATA.numPlayoffTeams} make the playoffs`;
+
+/* standings table */
+(function(){
+  const tbl=document.getElementById("standings");
+  tbl.innerHTML=`<thead><tr><th>#</th><th class="l">Team</th><th>Record</th><th>PPG</th><th>PF</th><th>PA</th>
+    <th>Luck</th><th>Power</th><th>Playoffs</th><th>Title</th></tr></thead>`;
+  const tb=document.createElement("tbody");
+  for(const r of DATA.standings){
+    const tr=document.createElement("tr");
+    const luckCls = r.luck>0.05?"pos":r.luck<-0.05?"neg":"";
+    const mv = r.move>0?` <span class="pos">▲${r.move}</span>`:r.move<0?` <span class="neg">▼${-r.move}</span>`:"";
+    tr.innerHTML=`<td>${r.rank}</td>
+      <td class="l"><span class="dot" style="background:${cv(r.key)}"></span>${nm(r.key)}</td>
+      <td>${r.record}</td><td>${f1(r.ppg)}</td><td>${f1(r.pf)}</td><td>${f1(r.pa)}</td>
+      <td class="${luckCls}">${r.luck>0?"+":""}${f1(r.luck)}</td>
+      <td>${r.powerRank}${mv}</td>
+      <td>${r.playoffOdds==null?"—":pct(r.playoffOdds)}</td>
+      <td>${r.titleOdds==null?"—":pct(r.titleOdds)}</td>`;
+    tb.appendChild(tr);
+  }
+  tbl.appendChild(tb);
+})();
+
+/* ---- reusable labeled quadrant scatter ---- */
+function scatter(id, pts, opt){
+  const W=660, H=470, M={l:62,r:116,t:34,b:46};
+  const svg=document.getElementById(id); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
+  const pad=(a)=>{const lo=Math.min(...a),hi=Math.max(...a),p=(hi-lo)*0.14||1;return [lo-p,hi+p];};
+  let [x0,x1]=opt.xDomain||pad(xs), [y0,y1]=opt.yDomain||pad(ys);
+  if(opt.square){ const lo=Math.min(x0,y0),hi=Math.max(x1,y1); x0=y0=lo; x1=y1=hi; }
+  const X=v=>M.l+(v-x0)/(x1-x0)*(W-M.l-M.r), Y=v=>H-M.b-(v-y0)/(y1-y0)*(H-M.t-M.b);
+  const ticks=(a,b,n)=>{const out=[],s=(b-a)/n;for(let i=0;i<=n;i++)out.push(a+s*i);return out;};
+  for(const t of ticks(x0,x1,5)){ S("line",{x1:X(t),x2:X(t),y1:M.t,y2:H-M.b,stroke:"var(--grid)","stroke-width":1},svg);
+    S("text",{x:X(t),y:H-M.b+18,"text-anchor":"middle",class:"axis-t",text:opt.xFmt(t)},svg); }
+  for(const t of ticks(y0,y1,5)){ S("line",{x1:M.l,x2:W-M.r,y1:Y(t),y2:Y(t),stroke:"var(--grid)","stroke-width":1},svg);
+    S("text",{x:M.l-8,y:Y(t)+4,"text-anchor":"end",class:"axis-t",text:opt.yFmt(t)},svg); }
+  S("text",{x:(M.l+W-M.r)/2,y:H-8,"text-anchor":"middle",class:"axis-lbl",text:opt.xLabel},svg);
+  S("text",{x:14,y:(M.t+H-M.b)/2,class:"axis-lbl",transform:`rotate(-90 14 ${(M.t+H-M.b)/2})`,"text-anchor":"middle",text:opt.yLabel},svg);
+  /* reference lines */
+  const med=a=>{const s=[...a].sort((p,q)=>p-q),m=s.length>>1;return s.length%2?s[m]:(s[m-1]+s[m])/2;};
+  if(opt.diag){ const lo=Math.max(x0,y0),hi=Math.min(x1,y1);
+    S("line",{x1:X(lo),y1:Y(lo),x2:X(hi),y2:Y(hi),stroke:"var(--muted)","stroke-width":1.5,"stroke-dasharray":"5 4"},svg); }
+  const mx=med(xs), my=med(ys);
+  if(opt.medianX!==false) S("line",{x1:X(mx),x2:X(mx),y1:M.t,y2:H-M.b,stroke:"var(--muted)","stroke-width":1.2,"stroke-dasharray":"2 4"},svg);
+  if(opt.medianY) S("line",{x1:M.l,x2:W-M.r,y1:Y(my),y2:Y(my),stroke:"var(--muted)","stroke-width":1.2,"stroke-dasharray":"2 4"},svg);
+  /* quadrant corner labels */
+  const q=opt.quadLabels||{};
+  if(q.tl)S("text",{x:M.l+8,y:M.t+16,class:"quad-lbl",text:q.tl},svg);
+  if(q.tr)S("text",{x:W-M.r-8,y:M.t+16,"text-anchor":"end",class:"quad-lbl",text:q.tr},svg);
+  if(q.bl)S("text",{x:M.l+8,y:H-M.b-10,class:"quad-lbl",text:q.bl},svg);
+  if(q.br)S("text",{x:W-M.r-8,y:H-M.b-10,"text-anchor":"end",class:"quad-lbl",text:q.br},svg);
+  /* points + collision-avoiding labels: try candidate offsets around each
+     dot, rejecting any that overlaps a placed label, a dot, or the edges */
+  const CH=6.9, LH=14;
+  const boxes=pts.map(p=>({x:X(p.x)-9,y:Y(p.y)-9,w:18,h:18}));  // dot hit-boxes
+  const hit=(a,b)=>a.x<b.x+b.w && b.x<a.x+a.w && a.y<b.y+b.h && b.y<a.y+a.h;
+  const placed=[];
+  function labelBox(px,py,dx,dy,anchor,w){
+    const lx=px+dx, ly=py+dy;
+    const bx=anchor==="start"?lx:anchor==="end"?lx-w:lx-w/2;
+    return {lx,ly,anchor,box:{x:bx,y:ly-11,w,h:LH}};
+  }
+  const CANDS=[[11,4,"start"],[-11,4,"end"],[0,-13,"middle"],[0,19,"middle"],
+               [11,-10,"start"],[11,18,"start"],[-11,-10,"end"],[-11,18,"end"],
+               [11,32,"start"],[-11,32,"end"]];
+  const labeled=[];
+  const order=[...pts].sort((a,b)=>Y(a.y)-Y(b.y));
+  const textOf=opt.labelOf||(p=>short(p.key));
+  const wants=opt.labelIf||(()=>true);
+  for(const p of order){
+    if(!wants(p)) continue;
+    const w=textOf(p).length*CH, px=X(p.x), py=Y(p.y);
+    let pick=null;
+    for(const [dx,dy,an] of CANDS){
+      const c=labelBox(px,py,dx,dy,an,w);
+      if(c.box.x<2||c.box.x+c.box.w>W-2||c.box.y<M.t-18||c.box.y+c.box.h>H-M.b+22) continue;
+      if(placed.some(b=>hit(c.box,b))||boxes.some(b=>hit(c.box,b))) continue;
+      pick=c; break;
+    }
+    if(!pick){ pick=labelBox(px,py,11,4,"start",w);
+      while(placed.some(b=>hit(pick.box,b))) { pick.ly+=14; pick.box.y+=14; } }
+    placed.push(pick.box);
+    labeled.push({p,...pick});
+  }
+  for(const p of pts){
+    const c=S("circle",{cx:X(p.x),cy:Y(p.y),r:7,css:`fill:${cv(p.key)}`,stroke:"var(--surface)","stroke-width":2},svg);
+    hover(c, `<b>${opt.titleOf?opt.titleOf(p):nm(p.key)}</b><br>${opt.xLabel}: ${opt.xFmt(p.x)}<br>${opt.yLabel}: ${opt.yFmt(p.y)}${opt.extra?opt.extra(p):""}`);
+  }
+  for(const l of labeled) S("text",{x:l.lx,y:l.ly,"text-anchor":l.anchor,class:"pt-lbl",text:textOf(l.p)},svg);
+}
+
+scatter("luckQuad", DATA.luckQuad, {
+  xLabel:"Expected wins", yLabel:"Actual wins", xFmt:f1, yFmt:f1, square:true, diag:true,
+  quadLabels:{tl:"Riding luck", tr:"Earning it", bl:"Just rebuilding", br:"Getting robbed"},
+  extra:p=>`<br>Luck: ${p.y-p.x>0?"+":""}${f1(p.y-p.x)} wins`
+});
+if(DATA.mgrQuad.length) scatter("mgrQuad", DATA.mgrQuad, {
+  xLabel:"Best-lineup points per week", yLabel:"Lineup efficiency %", xFmt:f1, yFmt:v=>f1(v)+"%",
+  medianY:true,
+  quadLabels:{tl:"Squeezing a thin roster", tr:"Stacked and sharp", bl:"Rough all around", br:"Stacked but sloppy"}
+});
+scatter("rangeQuad", DATA.rangeQuad, {
+  xLabel:"Floor (worst week)", yLabel:"Ceiling (best week)", xFmt:f1, yFmt:f1,
+  medianY:true,
+  quadLabels:{tl:"Boom or bust", tr:"Juggernaut", bl:"Rough all around", br:"Steady but capped"},
+  extra:p=>`<br>Season PPG: ${f1(p.ppg)}`
+});
+
+/* ---- scoring distribution strips ---- */
+(function(){
+  const rows=DATA.teams.map(t=>{
+    const s=DATA.weekly.scores[t.key];
+    const sorted=[...s].sort((a,b)=>a-b);
+    const medv=sorted.length%2?sorted[sorted.length>>1]:(sorted[sorted.length/2-1]+sorted[sorted.length/2])/2;
+    return {key:t.key, s, min:Math.min(...s), max:Math.max(...s), med:medv};
+  }).sort((a,b)=>b.med-a.med);
+  const all=DATA.teams.flatMap(t=>DATA.weekly.scores[t.key]);
+  const lo=Math.min(...all)-6, hi=Math.max(...all)+6;
+  const leagueMed=(a=>{const s=[...a].sort((p,q)=>p-q);return (s[(s.length-1)>>1]+s[s.length>>1])/2;})(all);
+  const W=660, RH=30, M={l:150,r:28,t:26,b:40}, H=M.t+M.b+rows.length*RH;
+  const svg=document.getElementById("strips"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const X=v=>M.l+(v-lo)/(hi-lo)*(W-M.l-M.r);
+  for(let t=Math.ceil(lo/25)*25;t<=hi;t+=25){
+    S("line",{x1:X(t),x2:X(t),y1:M.t-6,y2:H-M.b+4,stroke:"var(--grid)","stroke-width":1},svg);
+    S("text",{x:X(t),y:H-M.b+20,"text-anchor":"middle",class:"axis-t",text:t},svg);
+  }
+  const lm=S("line",{x1:X(leagueMed),x2:X(leagueMed),y1:M.t-6,y2:H-M.b+4,stroke:"var(--ink-2)","stroke-width":1.4,"stroke-dasharray":"5 4"},svg);
+  hover(lm,`League median: <b>${f1(leagueMed)}</b>`);
+  S("text",{x:X(leagueMed),y:M.t-10,"text-anchor":"middle",class:"axis-t",text:`league median ${f1(leagueMed)}`},svg);
+  rows.forEach((r,i)=>{
+    const y=M.t+i*RH+RH/2;
+    S("text",{x:M.l-10,y:y+4,"text-anchor":"end",class:"pt-lbl",text:short(r.key)},svg);
+    const band=S("rect",{x:X(r.min),y:y-7,width:Math.max(X(r.max)-X(r.min),2),height:14,rx:7,css:`fill:${cv(r.key)};opacity:.18`},svg);
+    hover(band,`<b>${nm(r.key)}</b><br>Floor ${f1(r.min)} · Median ${f1(r.med)} · Ceiling ${f1(r.max)}`);
+    S("line",{x1:X(r.med),x2:X(r.med),y1:y-9,y2:y+9,css:`stroke:${cv(r.key)}`,"stroke-width":2.5},svg);
+    r.s.forEach((v,wi)=>{
+      const d=S("circle",{cx:X(v),cy:y,r:4.5,css:`fill:${cv(r.key)}`,stroke:"var(--surface)","stroke-width":1.5},svg);
+      hover(d,`<b>${nm(r.key)}</b><br>Week ${DATA.weekly.weeks[wi]}: ${f1(v)} pts`);
+    });
+  });
+  S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Points scored"},svg);
+})();
+
+/* ---- playoff odds race ---- */
+(function(){
+  const wk=DATA.oddsRace.weeks; if(!wk.length) return;
+  const W=660,H=420,M={l:56,r:175,t:20,b:44};
+  const rshort=k=>{const n=nm(k);return n.length>13?n.slice(0,12).trimEnd()+"…":n;};
+  const svg=document.getElementById("race"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const X=w=>M.l+(w-wk[0])/(wk[wk.length-1]-wk[0]||1)*(W-M.l-M.r);
+  const Y=v=>H-M.b-v*(H-M.t-M.b);
+  for(const t of [0,.25,.5,.75,1]){
+    S("line",{x1:M.l,x2:W-M.r,y1:Y(t),y2:Y(t),stroke:"var(--grid)","stroke-width":1},svg);
+    S("text",{x:M.l-8,y:Y(t)+4,"text-anchor":"end",class:"axis-t",text:Math.round(t*100)+"%"},svg);
+  }
+  for(const w of wk){ S("text",{x:X(w),y:H-M.b+20,"text-anchor":"middle",class:"axis-t",text:"Wk "+w},svg); }
+  S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Playoff probability after each week"},svg);
+  const ends=[];
+  for(const t of DATA.teams){
+    const v=DATA.oddsRace.odds[t.key];
+    const dpath=v.map((o,i)=>`${i?"L":"M"}${X(wk[i])},${Y(o)}`).join("");
+    const line=S("path",{d:dpath,fill:"none",css:`stroke:${t.var}`,"stroke-width":2.4,"stroke-linejoin":"round"},svg);
+    hover(line, `<b>${t.name}</b><br>`+v.map((o,i)=>`Wk ${wk[i]}: ${pct(o)}`).join("<br>"));
+    v.forEach((o,i)=>{ const d=S("circle",{cx:X(wk[i]),cy:Y(o),r:3.6,css:`fill:${t.var}`,stroke:"var(--surface)","stroke-width":1.4},svg);
+      hover(d,`<b>${t.name}</b><br>After week ${wk[i]}: ${pct(o)}`); });
+    ends.push({key:t.key,y:Y(v[v.length-1]),v:v[v.length-1]});
+  }
+  ends.sort((a,b)=>a.y-b.y);
+  for(let i=1;i<ends.length;i++) if(ends[i].y-ends[i-1].y<14) ends[i].y=ends[i-1].y+14;
+  for(const e of ends) S("text",{x:W-M.r+8,y:e.y+4,class:"pt-lbl",css:"font-size:12.5px",text:`${rshort(e.key)} ${pct(e.v)}`},svg);
+})();
+
+/* ---- small multiples ---- */
+(function(){
+  const box=document.getElementById("multiples");
+  const all=DATA.teams.flatMap(t=>DATA.weekly.scores[t.key]);
+  const lo=Math.min(...all)-8, hi=Math.max(...all)+8, wk=DATA.weekly.weeks;
+  const order=[...DATA.teams].sort((a,b)=>{
+    const avg=k=>DATA.weekly.scores[k].reduce((s,v)=>s+v,0)/wk.length;
+    return avg(b.key)-avg(a.key); });
+  for(const t of order){
+    const W=220,H=120,M={l:8,r:30,t:10,b:8};
+    const d=document.createElement("div"); d.className="mini";
+    d.innerHTML=`<div class="nm"><span class="dot" style="background:${t.var};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px"></span>${t.name}</div>`;
+    const svg=S("svg",{viewBox:`0 0 ${W} ${H}`});
+    const X=i=>M.l+i/(wk.length-1||1)*(W-M.l-M.r), Y=v=>H-M.b-(v-lo)/(hi-lo)*(H-M.t-M.b);
+    svg.appendChild(S("path",{d:DATA.weekly.median.map((m,i)=>`${i?"L":"M"}${X(i)},${Y(m)}`).join(""),fill:"none",stroke:"var(--muted)","stroke-width":1.2,"stroke-dasharray":"3 3"}));
+    const s=DATA.weekly.scores[t.key];
+    svg.appendChild(S("path",{d:s.map((v,i)=>`${i?"L":"M"}${X(i)},${Y(v)}`).join(""),fill:"none",css:`stroke:${t.var}`,"stroke-width":2.2,"stroke-linejoin":"round"}));
+    s.forEach((v,i)=>{ const c=S("circle",{cx:X(i),cy:Y(v),r:3,css:`fill:${t.var}`,stroke:"var(--surface)","stroke-width":1.2}); svg.appendChild(c);
+      hover(c,`<b>${t.name}</b><br>Week ${wk[i]}: ${f1(v)} pts`); });
+    const last=s[s.length-1];
+    svg.appendChild(S("text",{x:X(s.length-1)+5,y:Y(last)+4,class:"axis-t",css:"font-size:11px;fill:var(--ink-2)",text:Math.round(last)}));
+    d.appendChild(svg); box.appendChild(d);
+  }
+})();
+
+/* ---- all-play heatmap ---- */
+(function(){
+  const order=DATA.allPlay.order, n=order.length;
+  const cell=38, M={l:150,t:96,r:10,b:10};
+  const W=M.l+n*cell+M.r, H=M.t+n*cell+M.b;
+  const svg=document.getElementById("heat"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const bin=p=>p>=0.92?6:p>=0.75?5:p>=0.6?4:p>=0.45?3:p>=0.3?2:p>=0.12?1:0;
+  order.forEach((rk,i)=>{
+    S("text",{x:M.l-10,y:M.t+i*cell+cell/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(rk)},svg);
+    S("text",{x:M.l+i*cell+cell/2,y:M.t-8,"text-anchor":"start",class:"axis-t",css:"font-size:11.5px",
+      transform:`rotate(-52 ${M.l+i*cell+cell/2} ${M.t-8})`,text:short(rk)},svg);
+    order.forEach((ck,j)=>{
+      const x=M.l+j*cell, y=M.t+i*cell;
+      if(rk===ck){ S("rect",{x:x+1,y:y+1,width:cell-2,height:cell-2,rx:3,fill:"var(--grid)",opacity:.45},svg); return; }
+      const c=DATA.allPlay.cells[rk][ck];
+      const r=S("rect",{x:x+1,y:y+1,width:cell-2,height:cell-2,rx:3,fill:`var(--heat${bin(c.pct)})`},svg);
+      const rec=`${c.w}-${c.l}${c.t?"-"+c.t:""}`;
+      S("text",{x:x+cell/2,y:y+cell/2+4,"text-anchor":"middle",
+        css:`font-size:11px;fill:${bin(c.pct)>=4?"var(--surface)":"var(--ink-2)"}`,text:rec},svg);
+      hover(r,`<b>${nm(rk)}</b> outscored <b>${nm(ck)}</b><br>${rec} across ${c.w+c.l+c.t} weeks (${pct(c.pct)})`);
+    });
+  });
+})();
+
+/* ---- transaction desk ---- */
+(function(){
+  const T=DATA.txns||{};
+  /* best pickups: horizontal bars of started points since the add */
+  const picks=(T.pickups||[]).filter(p=>p.started>0);
+  if(picks.length){
+    const W=660, RH=30, M={l:230,r:60,t:8,b:30}, H=M.t+M.b+picks.length*RH;
+    const svg=document.getElementById("pickups"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const hi=Math.max(...picks.map(p=>p.started));
+    const X=v=>M.l+v/hi*(W-M.l-M.r);
+    picks.forEach((p,i)=>{
+      const y=M.t+i*RH;
+      const lbl=p.player.length>26?p.player.slice(0,25)+"…":p.player;
+      S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:lbl},svg);
+      const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(p.started)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(p.key)}`},svg);
+      hover(bar,`<b>${p.player}</b> → ${nm(p.key)}<br>Added week ${p.week}${p.faab?` for $${p.faab}`:" (free)"}<br>${f1(p.started)} pts started (${p.starts} starts) · ${f1(p.rostered)} rostered`);
+      S("text",{x:X(p.started)+6,y:y+RH/2+4,class:"axis-t",css:"font-size:12px",text:f1(p.started)},svg);
+    });
+    S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Points started since pickup"},svg);
+  }
+  /* FAAB market: dollars spent vs points returned */
+  const bids=T.faabMarket||[];
+  if(bids.length>=3){
+    const maxF=Math.max(...bids.map(b=>b.faab)), maxP=Math.max(...bids.map(b=>b.started));
+    scatter("faab", bids.map(b=>({x:b.faab,y:b.started,key:b.key,b})), {
+      xLabel:"FAAB spent ($)", yLabel:"Points started since", xFmt:v=>"$"+Math.round(v), yFmt:f1,
+      xDomain:[0,maxF*1.12+1], yDomain:[-2,Math.max(maxP*1.12,10)],
+      medianY:true,
+      quadLabels:{tl:"Bargain-bin wins", tr:"Paid and got it", bl:"Cheap darts", br:"Money on fire"},
+      labelOf:p=>p.b.player.length>16?p.b.player.slice(0,15)+"…":p.b.player,
+      labelIf:p=>p.b.faab>=15||p.b.started>=25,
+      titleOf:p=>`${p.b.player} → ${nm(p.key)}`,
+      extra:p=>`<br>Added week ${p.b.week}`
+    });
+  } else { const col=document.getElementById("faab").closest(".duo > div"); if(col) col.hidden=true; }
+  /* FAAB efficiency: started points per dollar, by team */
+  if(bids.length){
+    const agg={};
+    for(const b of bids){ const a=agg[b.key]||(agg[b.key]={spent:0,started:0}); a.spent+=b.faab; a.started+=b.started; }
+    const rows=Object.entries(agg).map(([key,a])=>({key,...a,ppd:a.started/a.spent}))
+      .sort((x,y)=>y.ppd-x.ppd);
+    const W=660, RH=30, M={l:230,r:150,t:8,b:30}, H=M.t+M.b+rows.length*RH;
+    const svg=document.getElementById("faabRoi"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const hi=Math.max(...rows.map(r=>r.ppd), 0.1);
+    const X=v=>M.l+v/hi*(W-M.l-M.r);
+    rows.forEach((r,i)=>{
+      const y=M.t+i*RH;
+      S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(r.key)},svg);
+      const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(r.ppd)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(r.key)}`},svg);
+      const dpp = r.started>0 ? "$"+(r.spent/r.started).toFixed(2)+" per point" : "no started points yet";
+      hover(bar,`<b>${nm(r.key)}</b><br>$${r.spent} spent on waivers → ${f1(r.started)} pts started<br>${dpp}`);
+      S("text",{x:X(r.ppd)+6,y:y+RH/2+4,class:"axis-t",css:"font-size:12px",
+        text:`${r.ppd.toFixed(2)} pts/$ ($${r.spent})`},svg);
+    });
+    S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Started points per FAAB dollar"},svg);
+  } else { const col=document.getElementById("faabRoi"); if(col) col.closest(".chart-card").hidden=true; }
+  /* trade scoreboard */
+  const box=document.getElementById("trades");
+  for(const t of (T.trades||[])){
+    const [a,b]=t.sides;
+    const lead = a.total===b.total?null:(a.total>b.total?a:b);
+    const d=document.createElement("div"); d.className="trade";
+    const side=s=>`<div class="side"><div>
+        <div class="tm"><span class="dot" style="background:${cv(s.key)};display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px"></span>${nm(s.key)} received</div>
+        <div class="pl">${s.players.map(p=>`${p.name} (${f1(p.started)})`).join(", ")}</div></div>
+        <div class="tot${lead===s?" pos":""}">${f1(s.total)}</div></div>`;
+    d.innerHTML=`<div class="hdr">Week ${t.week} trade${lead?"":" · dead even"}</div>${side(a)}${side(b)}`;
+    box.appendChild(d);
+  }
+  if(!(T.trades||[]).length) box.innerHTML='<p class="sec-sub">No trades yet this season.</p>';
+})();
+</script>
