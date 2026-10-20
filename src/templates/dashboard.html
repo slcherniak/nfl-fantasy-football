@@ -69,6 +69,15 @@ td .dot{display:inline-block;margin-right:7px;vertical-align:1px}
 .mini{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 8px 2px;min-width:0}
 .mini .nm{font-size:12.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .mini svg{width:100%;height:auto;display:block}
+.sub-h{font-family:var(--display);font-weight:600;font-size:18px;text-transform:uppercase;letter-spacing:.06em;margin:0 0 8px;color:var(--ink-2)}
+.trades{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px}
+.trade{background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:12px 14px}
+.trade .hdr{font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
+.trade .side{display:flex;justify-content:space-between;gap:10px;padding:6px 0;border-top:1px solid var(--grid)}
+.trade .side:first-of-type{border-top:none}
+.trade .tm{font-weight:700;font-size:13.5px}
+.trade .pl{font-size:12.5px;color:var(--ink-2)}
+.trade .tot{font-family:var(--display);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums;white-space:nowrap}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;line-height:1.35;padding:7px 10px;border-radius:5px;max-width:260px;z-index:10;opacity:0;transition:opacity .08s}
 footer{margin-top:48px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:13px}
 svg text{font-family:var(--body)}
@@ -133,6 +142,23 @@ svg text{font-family:var(--body)}
 </section>
 
 <section>
+  <div class="sec-head"><h2>The Transaction Desk</h2></div>
+  <p class="sec-sub">Every move graded by what the player actually scored <em>in the lineup</em> after it — points rotting on the bench don't count. Re-graded automatically each week.</p>
+  <div class="duo">
+    <div>
+      <h3 class="sub-h">Best pickups of the season</h3>
+      <div class="chart-card"><div class="scrollwrap"><svg id="pickups"></svg></div></div>
+    </div>
+    <div>
+      <h3 class="sub-h">The FAAB market</h3>
+      <div class="chart-card"><div class="scrollwrap"><svg id="faab"></svg></div></div>
+    </div>
+  </div>
+  <h3 class="sub-h" style="margin-top:18px">Trade scoreboard</h3>
+  <div id="trades" class="trades"></div>
+</section>
+
+<section>
   <div class="sec-head"><h2>All-Play Domination Grid</h2></div>
   <p class="sec-sub">Row team's weekly-score record against each column team across every week, even when they never met. Darker means more dominant. Teams ordered by all-play wins.</p>
   <div class="chart-card"><div class="scrollwrap"><svg id="heat"></svg></div></div>
@@ -170,9 +196,10 @@ document.getElementById("subline").textContent =
 const tileBox = document.getElementById("tiles");
 for(const t of Object.values(DATA.tiles)){
   const d=document.createElement("div"); d.className="tile";
+  const who = t.who ? `${t.who} · ${nm(t.key)}` : nm(t.key);
   d.innerHTML=`<div class="lbl">${t.label} · Wk ${DATA.asOfWeek}</div>
     <div class="num">${f1(t.points)}</div>
-    <div class="who"><span class="dot" style="background:${cv(t.key)}"></span>${nm(t.key)}</div>`;
+    <div class="who"><span class="dot" style="background:${cv(t.key)}"></span>${who}</div>`;
   tileBox.appendChild(d);
 }
 const leg = document.getElementById("legend");
@@ -248,8 +275,11 @@ function scatter(id, pts, opt){
                [11,32,"start"],[-11,32,"end"]];
   const labeled=[];
   const order=[...pts].sort((a,b)=>Y(a.y)-Y(b.y));
+  const textOf=opt.labelOf||(p=>short(p.key));
+  const wants=opt.labelIf||(()=>true);
   for(const p of order){
-    const w=short(p.key).length*CH, px=X(p.x), py=Y(p.y);
+    if(!wants(p)) continue;
+    const w=textOf(p).length*CH, px=X(p.x), py=Y(p.y);
     let pick=null;
     for(const [dx,dy,an] of CANDS){
       const c=labelBox(px,py,dx,dy,an,w);
@@ -262,11 +292,11 @@ function scatter(id, pts, opt){
     placed.push(pick.box);
     labeled.push({p,...pick});
   }
-  for(const {p} of labeled){
+  for(const p of pts){
     const c=S("circle",{cx:X(p.x),cy:Y(p.y),r:7,css:`fill:${cv(p.key)}`,stroke:"var(--surface)","stroke-width":2},svg);
-    hover(c, `<b>${nm(p.key)}</b><br>${opt.xLabel}: ${opt.xFmt(p.x)}<br>${opt.yLabel}: ${opt.yFmt(p.y)}${opt.extra?opt.extra(p):""}`);
+    hover(c, `<b>${opt.titleOf?opt.titleOf(p):nm(p.key)}</b><br>${opt.xLabel}: ${opt.xFmt(p.x)}<br>${opt.yLabel}: ${opt.yFmt(p.y)}${opt.extra?opt.extra(p):""}`);
   }
-  for(const l of labeled) S("text",{x:l.lx,y:l.ly,"text-anchor":l.anchor,class:"pt-lbl",text:short(l.p.key)},svg);
+  for(const l of labeled) S("text",{x:l.lx,y:l.ly,"text-anchor":l.anchor,class:"pt-lbl",text:textOf(l.p)},svg);
 }
 
 scatter("luckQuad", DATA.luckQuad, {
@@ -397,5 +427,56 @@ scatter("rangeQuad", DATA.rangeQuad, {
       hover(r,`<b>${nm(rk)}</b> outscored <b>${nm(ck)}</b><br>${rec} across ${c.w+c.l+c.t} weeks (${pct(c.pct)})`);
     });
   });
+})();
+
+/* ---- transaction desk ---- */
+(function(){
+  const T=DATA.txns||{};
+  /* best pickups: horizontal bars of started points since the add */
+  const picks=(T.pickups||[]).filter(p=>p.started>0);
+  if(picks.length){
+    const W=660, RH=30, M={l:230,r:60,t:8,b:30}, H=M.t+M.b+picks.length*RH;
+    const svg=document.getElementById("pickups"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const hi=Math.max(...picks.map(p=>p.started));
+    const X=v=>M.l+v/hi*(W-M.l-M.r);
+    picks.forEach((p,i)=>{
+      const y=M.t+i*RH;
+      const lbl=p.player.length>26?p.player.slice(0,25)+"…":p.player;
+      S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:lbl},svg);
+      const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(p.started)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(p.key)}`},svg);
+      hover(bar,`<b>${p.player}</b> → ${nm(p.key)}<br>Added week ${p.week}${p.faab?` for $${p.faab}`:" (free)"}<br>${f1(p.started)} pts started (${p.starts} starts) · ${f1(p.rostered)} rostered`);
+      S("text",{x:X(p.started)+6,y:y+RH/2+4,class:"axis-t",css:"font-size:12px",text:f1(p.started)},svg);
+    });
+    S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Points started since pickup"},svg);
+  }
+  /* FAAB market: dollars spent vs points returned */
+  const bids=T.faabMarket||[];
+  if(bids.length>=3){
+    const maxF=Math.max(...bids.map(b=>b.faab)), maxP=Math.max(...bids.map(b=>b.started));
+    scatter("faab", bids.map(b=>({x:b.faab,y:b.started,key:b.key,b})), {
+      xLabel:"FAAB spent ($)", yLabel:"Points started since", xFmt:v=>"$"+Math.round(v), yFmt:f1,
+      xDomain:[0,maxF*1.12+1], yDomain:[-2,Math.max(maxP*1.12,10)],
+      medianY:true,
+      quadLabels:{tl:"Bargain-bin wins", tr:"Paid and got it", bl:"Cheap darts", br:"Money on fire"},
+      labelOf:p=>p.b.player.length>16?p.b.player.slice(0,15)+"…":p.b.player,
+      labelIf:p=>p.b.faab>=15||p.b.started>=25,
+      titleOf:p=>`${p.b.player} → ${nm(p.key)}`,
+      extra:p=>`<br>Added week ${p.b.week}`
+    });
+  } else { const col=document.getElementById("faab").closest(".duo > div"); if(col) col.hidden=true; }
+  /* trade scoreboard */
+  const box=document.getElementById("trades");
+  for(const t of (T.trades||[])){
+    const [a,b]=t.sides;
+    const lead = a.total===b.total?null:(a.total>b.total?a:b);
+    const d=document.createElement("div"); d.className="trade";
+    const side=s=>`<div class="side"><div>
+        <div class="tm"><span class="dot" style="background:${cv(s.key)};display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px"></span>${nm(s.key)} received</div>
+        <div class="pl">${s.players.map(p=>`${p.name} (${f1(p.started)})`).join(", ")}</div></div>
+        <div class="tot${lead===s?" pos":""}">${f1(s.total)}</div></div>`;
+    d.innerHTML=`<div class="hdr">Week ${t.week} trade${lead?"":" · dead even"}</div>${side(a)}${side(b)}`;
+    box.appendChild(d);
+  }
+  if(!(T.trades||[]).length) box.innerHTML='<p class="sec-sub">No trades yet this season.</p>';
 })();
 </script>

@@ -178,6 +178,54 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
             cells[a][b] = {"w": w, "l": l, "t": t,
                            "pct": round((w + 0.5 * t) / games, 3) if games else 0.0}
 
+    # --- transactions: pickups, FAAB market, trade scoreboard ----------------
+    txns = pd.read_sql_query("SELECT * FROM transactions", conn)
+    starter_slots = set(settings.non_starting_slots)
+    txn_data = {"pickups": [], "faabMarket": [], "trades": []}
+    best_pickup_tile = None
+    if not txns.empty and not rosters.empty:
+        def points_since(player_key: str, team_key: str, from_week: int) -> tuple[float, float, int]:
+            r = rosters[(rosters.player_key == player_key) & (rosters.team_key == team_key)
+                        & (rosters.week >= from_week)]
+            started = r[~r.slot.isin(starter_slots)]
+            return float(started.points.fillna(0).sum()), float(r.points.fillna(0).sum()), int(len(started))
+
+        adds = txns[txns.move_type == "add"].sort_values("timestamp")
+        adds = adds.drop_duplicates(subset=["team_key", "player_key"], keep="first")
+        graded = []
+        for a in adds.itertuples():
+            started, rostered, n_starts = points_since(a.player_key, a.team_key, int(a.week))
+            graded.append({
+                "key": a.team_key, "player": a.player_name, "week": int(a.week),
+                "faab": None if pd.isna(a.faab_spent) else int(a.faab_spent),
+                "started": round(started, 1), "rostered": round(rostered, 1),
+                "starts": n_starts,
+            })
+        graded.sort(key=lambda g: -g["started"])
+        txn_data["pickups"] = graded[:10]
+        txn_data["faabMarket"] = [g for g in graded if (g["faab"] or 0) > 0]
+
+        week_adds = [g for g in graded if g["week"] == latest and g["started"] > 0]
+        if week_adds:
+            best = max(week_adds, key=lambda g: g["started"])
+            best_pickup_tile = {"label": "Best pickup", "key": best["key"],
+                                "points": best["started"], "who": best["player"]}
+
+        trades = txns[txns.move_type == "trade-in"]
+        for ts, group in sorted(trades.groupby("timestamp"), key=lambda kv: -kv[0]):
+            sides = []
+            for team_key, side in group.groupby("team_key"):
+                players = []
+                for p in side.itertuples():
+                    started, rostered, _ = points_since(p.player_key, team_key, int(p.week))
+                    players.append({"name": p.player_name, "started": round(started, 1),
+                                    "rostered": round(rostered, 1)})
+                players.sort(key=lambda q: -q["started"])
+                sides.append({"key": team_key, "players": players,
+                              "total": round(sum(q["started"] for q in players), 1)})
+            if len(sides) == 2:
+                txn_data["trades"].append({"week": int(group.week.iloc[0]), "sides": sides})
+
     # --- latest-week awards ----------------------------------------------------
     week_m = matchups[matchups["week"] == latest]
     week_eff = eff_weekly[eff_weekly["week"] == latest] if not eff_weekly.empty else None
@@ -188,6 +236,8 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
         a = week_awards.get(slot)
         if a:
             tiles[slot] = {"label": label, "key": a["team_key"], "points": round(a["points"], 1)}
+    if best_pickup_tile:
+        tiles["best_pickup"] = best_pickup_tile
 
     return {
         "asOfWeek": latest,
@@ -201,6 +251,7 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
         "weekly": {"weeks": [int(w) for w in weeks], "scores": weekly_scores, "median": medians},
         "oddsRace": {"weeks": race_weeks, "odds": race},
         "allPlay": {"order": order, "cells": cells},
+        "txns": txn_data,
         "tiles": tiles,
     }
 
