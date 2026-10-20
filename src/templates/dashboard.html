@@ -152,6 +152,8 @@ svg text{font-family:var(--body)}
     <div>
       <h3 class="sub-h">The FAAB market</h3>
       <div class="chart-card"><div class="scrollwrap"><svg id="faab"></svg></div></div>
+      <h3 class="sub-h" style="margin-top:14px">FAAB efficiency</h3>
+      <div class="chart-card"><div class="scrollwrap"><svg id="faabRoi"></svg></div></div>
     </div>
   </div>
   <h3 class="sub-h" style="margin-top:18px">Trade scoreboard</h3>
@@ -464,6 +466,27 @@ scatter("rangeQuad", DATA.rangeQuad, {
       extra:p=>`<br>Added week ${p.b.week}`
     });
   } else { const col=document.getElementById("faab").closest(".duo > div"); if(col) col.hidden=true; }
+  /* FAAB efficiency: started points per dollar, by team */
+  if(bids.length){
+    const agg={};
+    for(const b of bids){ const a=agg[b.key]||(agg[b.key]={spent:0,started:0}); a.spent+=b.faab; a.started+=b.started; }
+    const rows=Object.entries(agg).map(([key,a])=>({key,...a,ppd:a.started/a.spent}))
+      .sort((x,y)=>y.ppd-x.ppd);
+    const W=660, RH=30, M={l:230,r:150,t:8,b:30}, H=M.t+M.b+rows.length*RH;
+    const svg=document.getElementById("faabRoi"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+    const hi=Math.max(...rows.map(r=>r.ppd), 0.1);
+    const X=v=>M.l+v/hi*(W-M.l-M.r);
+    rows.forEach((r,i)=>{
+      const y=M.t+i*RH;
+      S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(r.key)},svg);
+      const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(r.ppd)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(r.key)}`},svg);
+      const dpp = r.started>0 ? "$"+(r.spent/r.started).toFixed(2)+" per point" : "no started points yet";
+      hover(bar,`<b>${nm(r.key)}</b><br>$${r.spent} spent on waivers → ${f1(r.started)} pts started<br>${dpp}`);
+      S("text",{x:X(r.ppd)+6,y:y+RH/2+4,class:"axis-t",css:"font-size:12px",
+        text:`${r.ppd.toFixed(2)} pts/$ ($${r.spent})`},svg);
+    });
+    S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Started points per FAAB dollar"},svg);
+  } else { const col=document.getElementById("faabRoi"); if(col) col.closest(".chart-card").hidden=true; }
   /* trade scoreboard */
   const box=document.getElementById("trades");
   for(const t of (T.trades||[])){
