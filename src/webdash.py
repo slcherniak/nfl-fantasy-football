@@ -212,19 +212,95 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
                                 "points": best["started"], "who": best["player"]}
 
         trades = txns[txns.move_type == "trade-in"]
+        slots_cfg, flex_cfg = settings.roster_slots, settings.flex_eligibility
+        match_idx = {
+            (int(r.week), r.team_key): (float(r.points_for), float(r.points_against), r.result)
+            for r in matchups.itertuples()
+        }
+
+        def lineup_of(rows) -> list[efficiency.LineupPlayer]:
+            players = []
+            for r in rows.itertuples():
+                elig = frozenset(p for p in str(r.eligible_positions or "").split(",")
+                                 if p and p not in starter_slots)
+                players.append(efficiency.LineupPlayer(r.player_key, float(r.points or 0.0), elig))
+            return players
+
+        def sent_player_rows(sent, week):
+            """A sent player's real stat line that week, wherever they are."""
+            rows = []
+            for p in sent:
+                r = rosters[(rosters.player_key == p.player_key) & (rosters.week == week)]
+                if len(r):
+                    rows.append(r.iloc[0])
+            return rows
+
+        seen_trades = set()
         for ts, group in sorted(trades.groupby("timestamp"), key=lambda kv: -kv[0]):
+            group = group.drop_duplicates(subset=["team_key", "player_key"])
+            if group.team_key.nunique() != 2:
+                continue
+            wk0 = int(group.week.iloc[0])
+            sig = (wk0, frozenset(zip(group.team_key, group.player_key)))
+            if sig in seen_trades:   # same trade re-keyed by a timezone shift
+                continue
+            seen_trades.add(sig)
+
+            team_players = {tk: list(g.itertuples()) for tk, g in group.groupby("team_key")}
+            team_keys = list(team_players)
             sides = []
-            for team_key, side in group.groupby("team_key"):
+            for tk in team_keys:
+                received = team_players[tk]
+                sent = team_players[team_keys[1] if tk == team_keys[0] else team_keys[0]]
+                rec_keys = {p.player_key for p in received}
                 players = []
-                for p in side.itertuples():
-                    started, rostered, _ = points_since(p.player_key, team_key, int(p.week))
+                for p in received:
+                    started, rostered, _ = points_since(p.player_key, tk, wk0)
                     players.append({"name": p.player_name, "started": round(started, 1),
                                     "rostered": round(rostered, 1)})
                 players.sort(key=lambda q: -q["started"])
-                sides.append({"key": team_key, "players": players,
-                              "total": round(sum(q["started"] for q in players), 1)})
-            if len(sides) == 2:
-                txn_data["trades"].append({"week": int(group.week.iloc[0]), "sides": sides})
+
+                # Counterfactual replay: each week, this roster vs the same
+                # roster with the trade undone (sent players' real lines back).
+                swing, flips = 0.0, []
+                for w in range(wk0, latest + 1):
+                    mine = rosters[(rosters.team_key == tk) & (rosters.week == w)]
+                    if mine.empty:
+                        continue
+                    cf_players = lineup_of(mine[~mine.player_key.isin(rec_keys)])
+                    sent_rows = sent_player_rows(sent, w)
+                    for rr in sent_rows:
+                        elig = frozenset(x for x in str(rr.eligible_positions or "").split(",")
+                                         if x and x not in starter_slots)
+                        cf_players.append(efficiency.LineupPlayer(rr.player_key, float(rr.points or 0.0), elig))
+                    a_opt = efficiency.optimal_lineup_points(lineup_of(mine), slots_cfg, flex_cfg)
+                    c_opt = efficiency.optimal_lineup_points(cf_players, slots_cfg, flex_cfg)
+                    swing += a_opt - c_opt
+
+                    # Wins flipped: undo only the started received players and
+                    # refill their exact slots optimally from bench + sent.
+                    game = match_idx.get((w, tk))
+                    started_rec = mine[mine.player_key.isin(rec_keys) & ~mine.slot.isin(starter_slots)]
+                    if game and len(started_rec):
+                        pf, pa, res = game
+                        vacated = started_rec.slot.value_counts().to_dict()
+                        removed = float(started_rec.points.fillna(0).sum())
+                        pool = lineup_of(mine[mine.slot.isin(starter_slots) & ~mine.player_key.isin(rec_keys)])
+                        for rr in sent_rows:
+                            elig = frozenset(x for x in str(rr.eligible_positions or "").split(",")
+                                             if x and x not in starter_slots)
+                            pool.append(efficiency.LineupPlayer(rr.player_key, float(rr.points or 0.0), elig))
+                        refill = efficiency.optimal_lineup_points(pool, vacated, flex_cfg)
+                        cf_pf = pf - removed + refill
+                        cf_res = "T" if abs(cf_pf - pa) < 1e-9 else ("W" if cf_pf > pa else "L")
+                        if cf_res != res:
+                            # the trade turned a would-be cf_res into res
+                            flips.append({"week": w, "from": cf_res, "to": res})
+
+                sides.append({"key": tk, "players": players,
+                              "total": round(sum(q["started"] for q in players), 1),
+                              "swing": round(swing, 1), "flips": flips})
+            txn_data["trades"].append({"week": wk0, "sides": sides})
 
     # --- latest-week awards ----------------------------------------------------
     week_m = matchups[matchups["week"] == latest]

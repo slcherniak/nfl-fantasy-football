@@ -347,7 +347,10 @@ def parse_transactions(soup: BeautifulSoup, league_id: str) -> list[dict[str, An
         for p in players:
             rows_out.append(
                 {
-                    "transaction_key": f"{ts.isoformat()}-{team_key}",
+                    # Keyed on date (not time): Yahoo renders times in the
+                    # viewer's timezone, so the same event can show different
+                    # clock times across fetches and would duplicate.
+                    "transaction_key": f"{ts.date().isoformat()}-{team_key}",
                     "player_key": p["player_key"],
                     "type": txn_type,
                     "week": _txn_week(ts),

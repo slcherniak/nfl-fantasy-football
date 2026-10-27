@@ -78,6 +78,8 @@ td .dot{display:inline-block;margin-right:7px;vertical-align:1px}
 .trade .tm{font-weight:700;font-size:13.5px}
 .trade .pl{font-size:12.5px;color:var(--ink-2)}
 .trade .tot{font-family:var(--display);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.trade .verdict{border-top:2px solid var(--grid);margin-top:8px;padding-top:8px;font-size:12.5px;color:var(--ink-2)}
+.trade .verdict b{color:var(--ink)}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;line-height:1.35;padding:7px 10px;border-radius:5px;max-width:260px;z-index:10;opacity:0;transition:opacity .08s}
 footer{margin-top:48px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:13px}
 svg text{font-family:var(--body)}
@@ -157,6 +159,7 @@ svg text{font-family:var(--body)}
     </div>
   </div>
   <h3 class="sub-h" style="margin-top:18px">Trade scoreboard</h3>
+  <p class="sec-sub">Each card shows started points from the players received, plus the <b>what-if verdict</b>: a replay of every week since the deal with the trade undone (optimal lineups in both worlds). Positive means the trade made that roster better than the no-trade world.</p>
   <div id="trades" class="trades"></div>
 </section>
 
@@ -497,8 +500,17 @@ scatter("rangeQuad", DATA.rangeQuad, {
         <div class="tm"><span class="dot" style="background:${cv(s.key)};display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px"></span>${nm(s.key)} received</div>
         <div class="pl">${s.players.map(p=>`${p.name} (${f1(p.started)})`).join(", ")}</div></div>
         <div class="tot${lead===s?" pos":""}">${f1(s.total)}</div></div>`;
-    d.innerHTML=`<div class="hdr">Week ${t.week} trade${lead?"":" · dead even"}</div>${side(a)}${side(b)}`;
+    d.innerHTML=`<div class="hdr">Week ${t.week} trade${lead?"":" · dead even"}</div>${side(a)}${side(b)}${verdict(a,b)}`;
     box.appendChild(d);
+  }
+  function verdict(a,b){
+    if(a.swing==null) return "";
+    const sw=s=>`${nm(s.key)} <b>${s.swing>0?"+":""}${f1(s.swing)}</b>`;
+    const flips=[...(a.flips||[]).map(f=>({s:a,...f})),...(b.flips||[]).map(f=>({s:b,...f}))];
+    const flipTxt = flips.length
+      ? flips.map(f=>`turned ${short(f.s.key)}'s week-${f.week} ${f.from} into a ${f.to}`).join("; ")
+      : "no final results changed yet";
+    return `<div class="verdict">What-if vs no trade: ${sw(a)} · ${sw(b)} roster pts — ${flipTxt}</div>`;
   }
   if(!(T.trades||[]).length) box.innerHTML='<p class="sec-sub">No trades yet this season.</p>';
 })();
