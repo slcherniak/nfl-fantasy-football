@@ -21,6 +21,7 @@ Page anchors this relies on (verified against the live league, Sept 2026):
 
 from __future__ import annotations
 
+import datetime
 import logging
 import os
 import re
@@ -268,4 +269,145 @@ def fetch_rosters_for_week(scraper: YahooScraper, conn: sqlite3.Connection, week
         rows = parse_roster(soup, str(team_id), week)
         total += models.upsert(conn, "rosters", rows, ["week", "team_key", "player_key"])
     logger.info("Week %d: upserted %d roster rows (scraped)", week, total)
+    return total
+
+
+# --------------------------------------------------------------------------
+# Transactions (adds/drops with FAAB bids, trades)
+# --------------------------------------------------------------------------
+
+SEASON_WEEK1_TUESDAY = datetime.date(2026, 9, 8)  # Tuesday before week 1 kickoff
+
+
+def _txn_week(ts: datetime.datetime) -> int:
+    """Map a transaction date to the NFL week it was made for (weeks roll on
+    Tuesday). Clamped to [1, 17]."""
+    days = (ts.date() - SEASON_WEEK1_TUESDAY).days
+    return max(1, min(17, days // 7 + 1))
+
+
+def _parse_txn_time(text: str) -> datetime.datetime | None:
+    """'Oct 20, 2:06 pm' — the page omits the year; infer from the season
+    (Aug-Dec = 2026, Jan onward = 2027)."""
+    try:
+        parsed = datetime.datetime.strptime(text.strip(), "%b %d, %I:%M %p")
+    except ValueError:
+        return None
+    year = 2026 if parsed.month >= 8 else 2027
+    return parsed.replace(year=year)
+
+
+def _txn_players(cell: Any) -> list[dict[str, Any]]:
+    """Player blocks inside one transaction cell. Each block holds the player
+    link plus either a source line ('Free Agent', 'Waivers ($12)') for adds or
+    a destination line ('To Waivers') for drops."""
+    players = []
+    for block in cell.find_all(["div", "p"], recursive=False):
+        link = block.select_one("a[href*='/players/']")
+        if link is None:
+            continue
+        key_match = re.search(r"/players/(\d+)", link["href"])
+        pos_span = block.select_one("span.F-position")
+        note = block.find("h6")
+        note_text = note.get_text(" ", strip=True) if note else ""
+        faab = re.search(r"\$(\d+)", note_text)
+        players.append(
+            {
+                "player_key": key_match.group(1) if key_match else re.sub(r"\W+", "-", link.get_text(strip=True).lower()),
+                "player_name": link.get_text(strip=True),
+                "position": (pos_span.get_text(strip=True).split("-")[-1].strip() if pos_span else None),
+                "move_type": "drop" if note_text.startswith("To ") else "add",
+                "faab_spent": float(faab.group(1)) if faab else None,
+            }
+        )
+    return players
+
+
+def _txn_team(tr: Any, league_id: str) -> tuple[str | None, datetime.datetime | None]:
+    team_link = tr.select_one(f"td.Ta-end a[href*='/f1/{league_id}/']")
+    match = re.search(rf"/f1/{league_id}/(\d+)", team_link["href"]) if team_link else None
+    ts_el = tr.select_one("span.F-timestamp")
+    ts = _parse_txn_time(ts_el.get_text(strip=True)) if ts_el else None
+    return (match.group(1) if match else None), ts
+
+
+def parse_transactions(soup: BeautifulSoup, league_id: str) -> list[dict[str, Any]]:
+    """One page of /transactions. Trades span two <tr>s sharing a rowspan
+    icon; adds/drops are single rows that may hold both an added and a
+    dropped player."""
+    table = soup.select_one("table.Tst-transaction-table")
+    if table is None:
+        return []
+    rows_out: list[dict[str, Any]] = []
+    trs = table.find_all("tr")
+
+    def emit(team_key, ts, txn_type, players, move_override=None):
+        if not team_key or not ts:
+            return
+        for p in players:
+            rows_out.append(
+                {
+                    # Keyed on date (not time): Yahoo renders times in the
+                    # viewer's timezone, so the same event can show different
+                    # clock times across fetches and would duplicate.
+                    "transaction_key": f"{ts.date().isoformat()}-{team_key}",
+                    "player_key": p["player_key"],
+                    "type": txn_type,
+                    "week": _txn_week(ts),
+                    "timestamp": int(ts.timestamp()),
+                    "team_key": team_key,
+                    "player_name": p["player_name"],
+                    "move_type": move_override or p["move_type"],
+                    "faab_spent": p["faab_spent"],
+                }
+            )
+
+    i = 0
+    while i < len(trs):
+        tr = trs[i]
+        icon = tr.select_one("span.F-icon")
+        if icon is None:
+            i += 1
+            continue
+        if "F-trade" in (icon.get("class") or []):
+            # This row and the next are the two sides of one trade; each
+            # lists the players *received* by that row's team.
+            for side in (tr, trs[i + 1] if i + 1 < len(trs) else None):
+                if side is None:
+                    continue
+                team_key, ts = _txn_team(side, league_id)
+                cell = next((td for td in side.find_all("td") if td.select_one("a[href*='/players/']")), None)
+                if cell is not None:
+                    emit(team_key, ts, "trade", _txn_players(cell), move_override="trade-in")
+            i += 2
+            continue
+        team_key, ts = _txn_team(tr, league_id)
+        cell = next((td for td in tr.find_all("td") if td.select_one("a[href*='/players/']")), None)
+        if cell is not None:
+            emit(team_key, ts, "add/drop", _txn_players(cell))
+        i += 1
+    return rows_out
+
+
+def fetch_transactions(scraper: YahooScraper, conn: sqlite3.Connection, max_pages: int = 12) -> int:
+    """Walk the paginated transactions list (newest first, 25 per page).
+    Stops early once a page yields only rows that are already stored."""
+    total = 0
+    for page in range(max_pages):
+        offset = page * 25
+        path = f"/transactions?transactionsfilter=all&count={offset}" if offset else "/transactions"
+        rows = parse_transactions(scraper.get(path), scraper.league_id)
+        if not rows:
+            break
+        existing = {
+            (r[0], r[1], r[2])
+            for r in conn.execute(
+                "SELECT transaction_key, player_key, move_type FROM transactions"
+            )
+        }
+        new = [r for r in rows if (r["transaction_key"], r["player_key"], r["move_type"]) not in existing]
+        total += models.upsert(conn, "transactions", rows, ["transaction_key", "player_key", "move_type"])
+        if not new and page > 0:
+            break
+    logger.info("Upserted %d transaction rows (scraped)", total)
     return total
