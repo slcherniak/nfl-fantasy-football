@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Man Camp Film Room</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@600;700&family=Source+Sans+3:ital,wght@0,400;0,600;0,700;1,400&display=swap">
 <style>
@@ -54,6 +59,7 @@ section{margin-top:40px}
 .chart-card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 10px 6px}
 .scrollwrap{overflow-x:auto}
 .scrollwrap svg{display:block;min-width:620px;width:100%;height:auto}
+.scrollwrap svg.fit{min-width:0}
 .duo{display:grid;grid-template-columns:1fr 1fr;gap:18px}
 @media(max-width:860px){.duo{grid-template-columns:1fr}}
 .tablewrap{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:8px}
@@ -97,7 +103,29 @@ svg text{font-family:var(--body)}
 .quad-lbl{fill:var(--muted);font-size:12.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase}
 .pt-lbl{fill:var(--ink);font-size:13.5px;font-weight:600}
 @media (prefers-reduced-motion: reduce){*{transition:none!important}}
+
+/* ---- phone layout ---- */
+html{-webkit-text-size-adjust:100%}
+@media(max-width:640px){
+  .wrap{padding-inline:14px;padding-block:20px 44px}
+  section{margin-top:30px}
+  h2{font-size:23px}
+  .subline{font-size:14px;margin-bottom:20px}
+  table{font-size:13px}
+  th{padding:9px 8px 5px}
+  td{padding:6px 8px}
+  .tile .num{font-size:28px}
+  /* Standings: rank is the row order anyway; drop the # column and pin the
+     team column so the stats can scroll under it. */
+  #standings th:first-child,#standings td:first-child{display:none}
+  #standings th:nth-child(2),#standings td:nth-child(2){
+    position:sticky;left:0;z-index:2;background:var(--surface);
+    max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+    box-shadow:2px 0 0 var(--grid)}
+}
 </style>
+</head>
+<body>
 
 <div class="wrap">
 <header class="masthead">
@@ -305,8 +333,14 @@ document.getElementById("foot").textContent =
 
 /* ---- reusable labeled quadrant scatter ---- */
 function scatter(id, pts, opt){
-  const W=660, H=470, M={l:62,r:116,t:34,b:46};
-  const svg=document.getElementById(id); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const svg=document.getElementById(id);
+  /* Fit the quadrant to the phone instead of forcing a sideways swipe:
+     below 620px of card width, shrink the viewBox so text renders 1:1. */
+  const avail=(svg.closest(".scrollwrap")||svg.parentNode).clientWidth||660;
+  const W=avail<620?Math.max(350,avail):660, H=W<620?440:470,
+        M=W<620?{l:46,r:96,t:30,b:44}:{l:62,r:116,t:34,b:46};
+  if(W<620) svg.classList.add("fit");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
   const pad=(a)=>{const lo=Math.min(...a),hi=Math.max(...a),p=(hi-lo)*0.14||1;return [lo-p,hi+p];};
   let [x0,x1]=opt.xDomain||pad(xs), [y0,y1]=opt.yDomain||pad(ys);
@@ -328,9 +362,12 @@ function scatter(id, pts, opt){
   if(opt.medianY) S("line",{x1:M.l,x2:W-M.r,y1:Y(my),y2:Y(my),stroke:"var(--muted)","stroke-width":1.2,"stroke-dasharray":"2 4"},svg);
   /* quadrant corner labels */
   const q=opt.quadLabels||{};
+  /* On a narrow (fit-to-phone) plot the left/right captions would collide,
+     so stagger each pair onto two lines. */
+  const stag=W<620?16:0;
   if(q.tl)S("text",{x:M.l+8,y:M.t+16,class:"quad-lbl",text:q.tl},svg);
-  if(q.tr)S("text",{x:W-M.r-8,y:M.t+16,"text-anchor":"end",class:"quad-lbl",text:q.tr},svg);
-  if(q.bl)S("text",{x:M.l+8,y:H-M.b-10,class:"quad-lbl",text:q.bl},svg);
+  if(q.tr)S("text",{x:W-M.r-8,y:M.t+16+stag,"text-anchor":"end",class:"quad-lbl",text:q.tr},svg);
+  if(q.bl)S("text",{x:M.l+8,y:H-M.b-10-stag,class:"quad-lbl",text:q.bl},svg);
   if(q.br)S("text",{x:W-M.r-8,y:H-M.b-10,"text-anchor":"end",class:"quad-lbl",text:q.br},svg);
   /* points + collision-avoiding labels: try candidate offsets around each
      dot, rejecting any that overlaps a placed label, a dot, or the edges */
@@ -750,3 +787,5 @@ scatter("rangeQuad", DATA.rangeQuad, {
   });
 })();
 </script>
+</body>
+</html>
