@@ -118,7 +118,7 @@ svg text{font-family:var(--body)}
 
 <section>
   <div class="sec-head"><h2>Standings, Adjusted for Reality</h2></div>
-  <p class="sec-sub">Record is what the schedule gave you. Luck is actual wins minus the wins your scores earned against the whole league (all-play). Odds come from 10,000 simulated season endings.</p>
+  <p class="sec-sub">Record is what the schedule gave you. All-Play is your record if you'd faced all 11 opponents every week — the schedule-proof version. Luck is actual wins minus the wins all-play says you earned. Odds come from 10,000 simulated season endings.</p>
   <div class="tablewrap"><table id="standings"></table></div>
 </section>
 
@@ -280,7 +280,9 @@ document.getElementById("foot").textContent =
 /* standings table */
 (function(){
   const tbl=document.getElementById("standings");
-  tbl.innerHTML=`<thead><tr><th>#</th><th class="l">Team</th><th>Record</th><th>PPG</th><th>PF</th><th>PA</th>
+  tbl.innerHTML=`<thead><tr><th>#</th><th class="l">Team</th><th>Record</th>
+    <th title="Your weekly score against all 11 opponents, every week">All-Play</th>
+    <th>PPG</th><th>PF</th><th>PA</th>
     <th>Luck</th><th>Power</th><th>Playoffs</th><th>Title</th></tr></thead>`;
   const tb=document.createElement("tbody");
   for(const r of DATA.standings){
@@ -289,7 +291,9 @@ document.getElementById("foot").textContent =
     const mv = r.move>0?` <span class="pos">▲${r.move}</span>`:r.move<0?` <span class="neg">▼${-r.move}</span>`:"";
     tr.innerHTML=`<td>${r.rank}</td>
       <td class="l"><span class="dot" style="background:${cv(r.key)}"></span>${nm(r.key)}</td>
-      <td>${r.record}</td><td>${f1(r.ppg)}</td><td>${f1(r.pf)}</td><td>${f1(r.pa)}</td>
+      <td>${r.record}</td>
+      <td>${r.allPlay} <span style="color:var(--muted)">${r.apPct.toFixed(3).replace(/^0/,"")}</span></td>
+      <td>${f1(r.ppg)}</td><td>${f1(r.pf)}</td><td>${f1(r.pa)}</td>
       <td class="${luckCls}">${r.luck>0?"+":""}${f1(r.luck)}</td>
       <td>${r.powerRank}${mv}</td>
       <td>${r.playoffOdds==null?"—":pct(r.playoffOdds)}</td>
