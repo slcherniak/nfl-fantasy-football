@@ -94,12 +94,20 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
     ).set_index("team_key") if not remaining.empty else None
 
     # --- standings table --------------------------------------------------
+    season_ap_idx = all_play.season_all_play(weekly_ap).set_index("team_key")
     standings = []
     for key in teams["team_key"]:
         lrow = luck_df.loc[key]
-        standings.append(_round_map({
+        ap = season_ap_idx.loc[key]
+        # ap_wins/ap_losses carry the 0.5-per-tie split; undo it for a
+        # displayable integer W-L-T line.
+        ap_t = int(ap["ap_ties"])
+        ap_w = int(round(float(ap["ap_wins"]) - 0.5 * ap_t))
+        ap_l = int(round(float(ap["ap_losses"]) - 0.5 * ap_t))
+        row = _round_map({
             "key": key,
             "record": f"{int(lrow['wins'])}-{int(lrow['losses'])}" + (f"-{int(lrow['ties'])}" if lrow["ties"] else ""),
+            "allPlay": f"{ap_w}-{ap_l}" + (f"-{ap_t}" if ap_t else ""),
             "wins": float(lrow["actual_wins"]),
             "pf": round(float(lrow["points_for"]), 1),
             "pa": round(float(lrow["points_against"]), 1),
@@ -109,7 +117,10 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
             "move": int(power.loc[key, "movement"]),
             "playoffOdds": float(final_odds.loc[key, "playoffs_odds"]) if final_odds is not None else None,
             "titleOdds": float(final_odds.loc[key, "title_odds"]) if final_odds is not None else None,
-        }))
+        })
+        # Three decimals, past _round_map's default two: .596 and .600 differ.
+        row["apPct"] = round(float(ap["ap_win_pct"]), 3)
+        standings.append(row)
     standings.sort(key=lambda r: (-r["wins"], -r["pf"]))
     for i, row in enumerate(standings):
         row["rank"] = i + 1
@@ -162,7 +173,7 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
             race[k].append(round(float(odds_w.loc[k, "playoffs_odds"]), 3))
 
     # --- all-play heatmap -----------------------------------------------------
-    season_ap = all_play.season_all_play(weekly_ap).sort_values("ap_wins", ascending=False)
+    season_ap = season_ap_idx.reset_index().sort_values("ap_wins", ascending=False)
     order = list(season_ap["team_key"])
     cells = {}
     for a in order:
