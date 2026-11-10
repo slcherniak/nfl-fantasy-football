@@ -482,3 +482,9 @@ if __name__ == "__main__":
     from src.config import load_settings
     out = render(models.connect(), load_settings(), "data/film_room.html")
     print(f"wrote {out}")
+    # Same page, committed path: public/index.html is what Vercel serves as a
+    # static site, so every pipeline run refreshes the deployable copy too.
+    site = Path("public/index.html")
+    site.parent.mkdir(parents=True, exist_ok=True)
+    site.write_text(out.read_text())
+    print(f"wrote {site}")

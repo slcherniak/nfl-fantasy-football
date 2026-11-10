@@ -20,6 +20,11 @@ jobs:
   update:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # contents: write lets the job commit the regenerated public/index.html
+    # (the Film Room page Vercel serves) back to master, which triggers a
+    # fresh Vercel deploy after every data update.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
@@ -50,3 +55,18 @@ jobs:
         # the full-season re-pull is idempotent and doubles as the
         # stat-correction refresh.
         run: python -m src.main --backfill
+
+      - name: Rebuild the Film Room page
+        run: python -m src.webdash
+
+      - name: Commit the refreshed site (triggers Vercel redeploy)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/index.html
+          if git diff --cached --quiet; then
+            echo "Film Room unchanged — nothing to commit."
+          else
+            git commit -m "Refresh Film Room page [skip ci]"
+            git push
+          fi
