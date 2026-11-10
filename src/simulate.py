@@ -83,6 +83,7 @@ def simulate_playoff_odds(
         key: np.zeros(n)
         for key in ("playoffs", "bye", "finals_from_bye", "finals_from_round1", "title")
     }
+    seed_counts = np.zeros((n, num_playoff_teams))
 
     for _ in range(num_sims):
         wins = base_wins.copy()
@@ -110,8 +111,9 @@ def simulate_playoff_odds(
             key=lambda t: (-wins[idx[t]], -opp_wins[t], -pf[idx[t]]),
         )
         seeds = seed_order[:num_playoff_teams]
-        for t in seeds:
+        for seed_pos, t in enumerate(seeds):
             counts["playoffs"][idx[t]] += 1
+            seed_counts[idx[t], seed_pos] += 1
         for t in seeds[:num_byes]:
             counts["bye"][idx[t]] += 1
 
@@ -129,6 +131,8 @@ def simulate_playoff_odds(
     odds = pd.DataFrame({"team_key": teams})
     for key, arr in counts.items():
         odds[f"{key}_odds"] = arr / num_sims
+    for s in range(num_playoff_teams):
+        odds[f"seed{s + 1}_odds"] = seed_counts[:, s] / num_sims
     odds["finals_odds"] = odds["finals_from_bye_odds"] + odds["finals_from_round1_odds"]
     return odds.sort_values("playoffs_odds", ascending=False).reset_index(drop=True)
 

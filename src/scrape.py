@@ -411,3 +411,60 @@ def fetch_transactions(scraper: YahooScraper, conn: sqlite3.Connection, max_page
             break
     logger.info("Upserted %d transaction rows (scraped)", total)
     return total
+
+
+# --------------------------------------------------------------------------
+# Draft results (static after draft day)
+# --------------------------------------------------------------------------
+
+def parse_draft(soup: BeautifulSoup, team_name_to_key: dict[str, str]) -> list[dict[str, Any]]:
+    """/draftresults: one table per round; rows are pick, player, team name.
+    Teams are matched by their *current* display name."""
+    picks: list[dict[str, Any]] = []
+    overall = 0
+    round_no = 0
+    for table in soup.find_all("table"):
+        rows = table.find_all("tr")
+        header = rows[0].get_text(" ", strip=True) if rows else ""
+        m = re.match(r"Round (\d+)", header)
+        if not m:
+            continue
+        round_no = int(m.group(1))
+        for tr in rows[1:]:
+            link = tr.select_one("td.player a[href*='/players/']")
+            team_td = tr.select_one("td.last")
+            pick_td = tr.select_one("td.first")
+            if link is None or team_td is None:
+                continue
+            overall += 1
+            key_match = re.search(r"/players/(\d+)", link["href"])
+            pos_span = tr.select_one("td.player span")
+            pos = None
+            if pos_span:
+                pm = re.search(r"-\s*([A-Z]{1,3})", pos_span.get_text(strip=True))
+                pos = pm.group(1) if pm else None
+            team_name = (team_td.get("title") or team_td.get_text(strip=True)).strip()
+            picks.append(
+                {
+                    "overall": overall,
+                    "round": round_no,
+                    "pick": int(re.sub(r"\D", "", pick_td.get_text(strip=True)) or 0) if pick_td else 0,
+                    "team_key": team_name_to_key.get(team_name),
+                    "player_key": key_match.group(1) if key_match else None,
+                    "player_name": link.get_text(strip=True),
+                    "position": pos,
+                }
+            )
+    return [p for p in picks if p["team_key"]]
+
+
+def fetch_draft(scraper: YahooScraper, conn: sqlite3.Connection) -> int:
+    """One-time pull; skipped once picks are stored (the draft never changes)."""
+    existing = conn.execute("SELECT COUNT(*) FROM draft_picks").fetchone()[0]
+    if existing:
+        return 0
+    name_to_key = {name: key for key, name in conn.execute("SELECT team_key, name FROM teams")}
+    picks = parse_draft(scraper.get("/draftresults"), name_to_key)
+    count = models.upsert(conn, "draft_picks", picks, ["overall"])
+    logger.info("Stored %d draft picks (scraped)", count)
+    return count

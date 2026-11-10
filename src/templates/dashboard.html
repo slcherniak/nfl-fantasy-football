@@ -80,6 +80,15 @@ td .dot{display:inline-block;margin-right:7px;vertical-align:1px}
 .trade .tot{font-family:var(--display);font-weight:700;font-size:22px;font-variant-numeric:tabular-nums;white-space:nowrap}
 .trade .verdict{border-top:2px solid var(--grid);margin-top:8px;padding-top:8px;font-size:12.5px;color:var(--ink-2)}
 .trade .verdict b{color:var(--ink)}
+.belt{background:var(--surface);border:2px solid var(--ink);border-radius:8px;padding:14px 16px;margin:18px 0 4px;display:flex;flex-wrap:wrap;gap:10px 24px;align-items:center;justify-content:space-between}
+.belt-main{display:flex;gap:14px;align-items:center}
+.belt-icon{font-size:34px}
+.belt-holder{font-family:var(--display);font-weight:700;font-size:26px;text-transform:uppercase;letter-spacing:.02em}
+.belt .lbl{font-size:11.5px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.belt-lineage{display:flex;flex-wrap:wrap;gap:5px;font-size:12px;color:var(--ink-2);align-items:center}
+.belt-lineage .chip{border:1px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap}
+ul.plain{list-style:none;margin:6px 0 0;padding:0;font-size:13px;color:var(--ink-2);display:grid;gap:5px}
+ul.plain b{color:var(--ink)}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;line-height:1.35;padding:7px 10px;border-radius:5px;max-width:260px;z-index:10;opacity:0;transition:opacity .08s}
 footer{margin-top:48px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:13px}
 svg text{font-family:var(--body)}
@@ -99,6 +108,13 @@ svg text{font-family:var(--body)}
 
 <div class="cardgrid" id="tiles"></div>
 <div class="legend" id="legend"></div>
+
+<div class="belt" id="belt" hidden>
+  <div class="belt-main"><span class="belt-icon">🏆</span>
+    <div><div class="lbl">The Man Camp Belt · lineal title, lost only head-to-head</div>
+    <div class="belt-holder" id="beltHolder"></div></div></div>
+  <div class="belt-lineage" id="beltLineage"></div>
+</div>
 
 <section>
   <div class="sec-head"><h2>Standings, Adjusted for Reality</h2></div>
@@ -137,10 +153,36 @@ svg text{font-family:var(--body)}
   <div class="chart-card"><div class="scrollwrap"><svg id="race"></svg></div></div>
 </section>
 
+<section class="duo">
+  <div>
+    <div class="sec-head"><h2>This Week's Leverage</h2></div>
+    <p class="sec-sub">What the next matchup is worth: playoff odds if you win vs if you lose, simulated both ways. The longer the bar, the bigger the game.</p>
+    <div class="chart-card"><div class="scrollwrap"><svg id="leverage"></svg></div></div>
+  </div>
+  <div>
+    <div class="sec-head"><h2>Seed Odds</h2></div>
+    <p class="sec-sub">Not just "in or out" — which seed. In a no-reseed bracket the 3-seed and 6-seed live different lives.</p>
+    <div class="chart-card"><div class="scrollwrap"><svg id="seeds"></svg></div></div>
+  </div>
+</section>
+
 <section>
   <div class="sec-head"><h2>Week-by-Week Trajectories</h2></div>
   <p class="sec-sub">Each team against the league median (dashed). Same scale everywhere, so shapes compare honestly.</p>
   <div class="mult-grid" id="multiples"></div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>Power Rank History</h2></div>
+  <p class="sec-sub">The composite power ranking recomputed after every week. Rank 1 at the top — watch the collapses.</p>
+  <div class="chart-card"><div class="scrollwrap"><svg id="powerHist"></svg></div></div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>Bench Crimes</h2></div>
+  <p class="sec-sub">The single worst legal start/sit call each week — the one bench player who should have been in, by name. Totals are cumulative points lost to the worst weekly call.</p>
+  <div class="chart-card"><div class="scrollwrap"><svg id="crimes"></svg></div></div>
+  <div id="crimeWeek" class="sec-sub" style="margin-top:10px"></div>
 </section>
 
 <section>
@@ -163,10 +205,32 @@ svg text{font-family:var(--body)}
   <div id="trades" class="trades"></div>
 </section>
 
+<section id="draftSec" hidden>
+  <div class="sec-head"><h2>Draft Report Card</h2></div>
+  <p class="sec-sub">Every pick graded by the player's total season points, wherever they ended up. Steals are round 8+; busts are rounds 1–3.</p>
+  <div class="duo">
+    <div><h3 class="sub-h">Points drafted per team</h3>
+      <div class="chart-card"><div class="scrollwrap"><svg id="draftTeams"></svg></div></div></div>
+    <div><h3 class="sub-h">Steals &amp; busts</h3><div id="draftLists"></div></div>
+  </div>
+</section>
+
+<section id="warSec" hidden>
+  <div class="sec-head"><h2>Deadline War Room</h2></div>
+  <p class="sec-sub" id="warSub"></p>
+  <div id="warCards" class="trades"></div>
+</section>
+
 <section>
   <div class="sec-head"><h2>All-Play Domination Grid</h2></div>
   <p class="sec-sub">Row team's weekly-score record against each column team across every week, even when they never met. Darker means more dominant. Teams ordered by all-play wins.</p>
   <div class="chart-card"><div class="scrollwrap"><svg id="heat"></svg></div></div>
+</section>
+
+<section>
+  <div class="sec-head"><h2>If You Had Their Schedule</h2></div>
+  <p class="sec-sub">Each row team's weekly scores replayed against each column team's actual schedule (facing the column team where they'd meet themselves). The diagonal is reality. The argument-ender.</p>
+  <div class="chart-card"><div class="scrollwrap"><svg id="swap"></svg></div></div>
 </section>
 
 <footer id="foot"></footer>
@@ -513,5 +577,172 @@ scatter("rangeQuad", DATA.rangeQuad, {
     return `<div class="verdict">What-if vs no trade: ${sw(a)} · ${sw(b)} roster pts — ${flipTxt}</div>`;
   }
   if(!(T.trades||[]).length) box.innerHTML='<p class="sec-sub">No trades yet this season.</p>';
+})();
+
+/* ---- the belt ---- */
+(function(){
+  const B=DATA.belt; if(!B||!B.holder) return;
+  const el=document.getElementById("belt"); el.hidden=false;
+  const cur=B.reigns[B.reigns.length-1];
+  document.getElementById("beltHolder").innerHTML=
+    `<span class="dot" style="background:${cv(B.holder)};display:inline-block;width:12px;height:12px;border-radius:50%;margin-right:7px"></span>`+
+    `${nm(B.holder)} <span style="font-size:14px;color:var(--ink-2);font-family:var(--body);text-transform:none;letter-spacing:0">· holding since week ${cur.from} (${cur.defenses} defense${cur.defenses===1?"":"s"})</span>`;
+  document.getElementById("beltLineage").innerHTML = "Lineage: " + B.reigns.map(r=>
+    `<span class="chip"><span class="dot" style="background:${cv(r.key)};display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px"></span>${short(r.key)} wk${r.from}${r.to?("–"+r.to):"–now"}</span>`
+  ).join(" → ");
+})();
+
+/* ---- leverage dumbbells ---- */
+(function(){
+  const L=DATA.leverage||[]; if(!L.length) return;
+  const W=660, RH=34, M={l:190,r:70,t:24,b:34}, H=M.t+M.b+L.length*RH;
+  const svg=document.getElementById("leverage"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const X=v=>M.l+v*(W-M.l-M.r);
+  for(const t of [0,.25,.5,.75,1]){
+    S("line",{x1:X(t),x2:X(t),y1:M.t-6,y2:H-M.b+4,stroke:"var(--grid)","stroke-width":1},svg);
+    S("text",{x:X(t),y:H-M.b+18,"text-anchor":"middle",class:"axis-t",text:Math.round(t*100)+"%"},svg);
+  }
+  L.forEach((r,i)=>{
+    const y=M.t+i*RH+RH/2;
+    S("text",{x:M.l-10,y:y+4,"text-anchor":"end",class:"pt-lbl",text:short(r.key)},svg);
+    const ln=S("line",{x1:X(r.ifLoss),x2:X(r.ifWin),y1:y,y2:y,css:`stroke:${cv(r.key)}`,"stroke-width":5,"stroke-linecap":"round",opacity:.45},svg);
+    S("circle",{cx:X(r.ifLoss),cy:y,r:5,fill:"var(--surface)",css:`stroke:${cv(r.key)}`,"stroke-width":2.5},svg);
+    S("circle",{cx:X(r.ifWin),cy:y,r:5,css:`fill:${cv(r.key)}`},svg);
+    S("text",{x:X(Math.max(r.ifWin,r.ifLoss))+10,y:y+4,class:"axis-t",css:"font-size:12px",text:`±${Math.round(r.swing*100)}%`},svg);
+    hover(ln,`<b>${nm(r.key)}</b> vs ${nm(r.opp)} (wk ${r.week})<br>Win: ${pct(r.ifWin)} playoff odds · Lose: ${pct(r.ifLoss)}<br>This game is worth ${Math.round(r.swing*100)} points of odds`);
+  });
+  S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Playoff odds: lose (hollow) → win (solid)"},svg);
+})();
+
+/* ---- seed odds matrix ---- */
+(function(){
+  const SM=DATA.seedMatrix||[]; if(!SM.length) return;
+  const nSeeds=SM[0].seeds.length, cell=56, rh=30, M={l:190,t:34,r:10,b:8};
+  const W=M.l+nSeeds*cell+M.r, H=M.t+SM.length*rh+M.b;
+  const svg=document.getElementById("seeds"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const bin=p=>p>=0.5?6:p>=0.35?5:p>=0.22?4:p>=0.12?3:p>=0.05?2:p>0?1:0;
+  for(let s=0;s<nSeeds;s++) S("text",{x:M.l+s*cell+cell/2,y:M.t-10,"text-anchor":"middle",class:"axis-t",text:"#"+(s+1)},svg);
+  SM.forEach((r,i)=>{
+    const y=M.t+i*rh;
+    S("text",{x:M.l-10,y:y+rh/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(r.key)},svg);
+    r.seeds.forEach((p,s)=>{
+      const rect=S("rect",{x:M.l+s*cell+1,y:y+1,width:cell-2,height:rh-2,rx:3,fill:`var(--heat${bin(p)})`},svg);
+      if(p>=0.01) S("text",{x:M.l+s*cell+cell/2,y:y+rh/2+4,"text-anchor":"middle",
+        css:`font-size:11px;fill:${bin(p)>=4?"var(--surface)":"var(--ink-2)"}`,text:Math.round(p*100)+"%"},svg);
+      hover(rect,`<b>${nm(r.key)}</b>: ${pct(p)} chance of the #${s+1} seed`);
+    });
+  });
+})();
+
+/* ---- power rank history bump chart ---- */
+(function(){
+  const PH=DATA.powerHistory; if(!PH||!PH.weeks.length) return;
+  const wk=PH.weeks, n=DATA.teams.length;
+  const W=660,H=420,M={l:40,r:150,t:16,b:40};
+  const svg=document.getElementById("powerHist"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const X=w=>M.l+(w-wk[0])/(wk[wk.length-1]-wk[0]||1)*(W-M.l-M.r);
+  const Y=r=>M.t+(r-1)/(n-1)*(H-M.t-M.b);
+  for(let r=1;r<=n;r++) S("text",{x:M.l-8,y:Y(r)+4,"text-anchor":"end",class:"axis-t",text:r},svg);
+  for(const w of wk) S("text",{x:X(w),y:H-M.b+20,"text-anchor":"middle",class:"axis-t",text:"Wk "+w},svg);
+  const ends=[];
+  for(const t of DATA.teams){
+    const v=PH.ranks[t.key];
+    const line=S("path",{d:v.map((r,i)=>`${i?"L":"M"}${X(wk[i])},${Y(r)}`).join(""),fill:"none",css:`stroke:${t.var}`,"stroke-width":2.4,"stroke-linejoin":"round"},svg);
+    hover(line,`<b>${t.name}</b><br>`+v.map((r,i)=>`Wk ${wk[i]}: #${r}`).join("<br>"));
+    v.forEach((r,i)=>S("circle",{cx:X(wk[i]),cy:Y(r),r:3.4,css:`fill:${t.var}`,stroke:"var(--surface)","stroke-width":1.3},svg));
+    ends.push({key:t.key,y:Y(v[v.length-1]),r:v[v.length-1]});
+  }
+  ends.sort((a,b)=>a.y-b.y);
+  for(let i=1;i<ends.length;i++) if(ends[i].y-ends[i-1].y<14) ends[i].y=ends[i-1].y+14;
+  for(const e of ends) S("text",{x:W-M.r+8,y:e.y+4,class:"pt-lbl",css:"font-size:12.5px",text:`#${e.r} ${short(e.key)}`},svg);
+  S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Power rank after each week (1 = best)"},svg);
+})();
+
+/* ---- bench crimes ---- */
+(function(){
+  const C=DATA.crimes; if(!C||!C.perTeam.length) return;
+  const rows=C.perTeam;
+  const W=660, RH=30, M={l:190,r:60,t:8,b:30}, H=M.t+M.b+rows.length*RH;
+  const svg=document.getElementById("crimes"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const hi=Math.max(...rows.map(r=>r.total));
+  const X=v=>M.l+v/hi*(W-M.l-M.r);
+  rows.forEach((r,i)=>{
+    const y=M.t+i*RH;
+    S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(r.key)},svg);
+    const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(r.total)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(r.key)}`},svg);
+    hover(bar,`<b>${nm(r.key)}</b>: ${f1(r.total)} pts lost to weekly worst calls<br>Worst: wk ${r.worst.week}, benched <b>${r.worst.benched}</b> (${f1(r.worst.benchedPts)}) behind ${r.worst.started} (${f1(r.worst.startedPts)}) at ${r.worst.slot} — cost ${f1(r.worst.gain)}`);
+    S("text",{x:X(r.total)+6,y:y+RH/2+4,class:"axis-t",css:"font-size:12px",text:f1(r.total)},svg);
+  });
+  S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Season points lost (worst call per week)"},svg);
+  if(C.thisWeek.length){
+    const w=C.thisWeek[0];
+    document.getElementById("crimeWeek").innerHTML =
+      `<b>Crime of week ${DATA.asOfWeek}:</b> ${nm(w.key)} benched <b>${w.benched}</b> (${f1(w.benchedPts)} pts) behind ${w.started} (${f1(w.startedPts)}) at ${w.slot} — a ${f1(w.gain)}-point sentence.`;
+  }
+})();
+
+/* ---- draft report card ---- */
+(function(){
+  const DC=DATA.draftCard; if(!DC) return;
+  document.getElementById("draftSec").hidden=false;
+  const rows=DC.teams;
+  const W=660, RH=30, M={l:190,r:70,t:8,b:30}, H=M.t+M.b+rows.length*RH;
+  const svg=document.getElementById("draftTeams"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const hi=Math.max(...rows.map(r=>r.points));
+  const X=v=>M.l+v/hi*(W-M.l-M.r);
+  rows.forEach((r,i)=>{
+    const y=M.t+i*RH;
+    S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(r.key)},svg);
+    const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(r.points)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(r.key)}`},svg);
+    hover(bar,`<b>${nm(r.key)}</b>: drafted players have scored ${f1(r.points)} pts this season (wherever they play now)`);
+    S("text",{x:X(r.points)+6,y:y+RH/2+4,class:"axis-t",css:"font-size:12px",text:Math.round(r.points)},svg);
+  });
+  const li=p=>`<li><b>${p.player}</b> (${p.position||"?"}, rd ${p.round} pk ${p.overall}) — ${f1(p.points)} pts · <span class="dot" style="background:${cv(p.key)};display:inline-block;width:8px;height:8px;border-radius:50%"></span> ${short(p.key)}</li>`;
+  document.getElementById("draftLists").innerHTML =
+    `<div class="tile" style="margin-bottom:10px"><div class="lbl">Steals (round 8+)</div><ul class="plain">${DC.steals.map(li).join("")}</ul></div>`+
+    `<div class="tile"><div class="lbl">Busts (rounds 1–3)</div><ul class="plain">${DC.busts.map(li).join("")}</ul></div>`;
+})();
+
+/* ---- deadline war room ---- */
+(function(){
+  const WR=DATA.warRoom; if(!WR||!WR.bubble.length) return;
+  document.getElementById("warSec").hidden=false;
+  document.getElementById("warSub").textContent =
+    `Trade deadline ${WR.deadline}. The bubble (10–90% playoff odds), each team's weakest starting slot vs league average, and what this week's game is worth.`;
+  const box=document.getElementById("warCards");
+  for(const b of WR.bubble){
+    const d=document.createElement("div"); d.className="trade";
+    d.innerHTML=`<div class="hdr">${pct(b.odds)} playoff odds</div>
+      <div class="tm" style="font-weight:700"><span class="dot" style="background:${cv(b.key)};display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px"></span>${nm(b.key)}</div>
+      <div class="pl" style="margin-top:6px">Weakest slot: <b>${b.weakSlot}</b> (${f1(b.deficit)} pts/wk vs league avg)${b.swing!=null?`<br>This week's game swings odds by <b>±${Math.round(b.swing*100)}%</b>`:""}</div>`;
+    box.appendChild(d);
+  }
+})();
+
+/* ---- schedule swap matrix ---- */
+(function(){
+  const SW=DATA.scheduleSwap; if(!SW) return;
+  const order=SW.order, n=order.length;
+  const cell=46, M={l:150,t:96,r:10,b:10};
+  const W=M.l+n*cell+M.r, H=M.t+n*cell+M.b;
+  const svg=document.getElementById("swap"); svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
+  const bin=f=>f>=0.85?6:f>=0.7?5:f>=0.58?4:f>=0.42?3:f>=0.3?2:f>=0.15?1:0;
+  order.forEach((rk,i)=>{
+    S("text",{x:M.l-10,y:M.t+i*cell+cell/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(rk)},svg);
+    S("text",{x:M.l+i*cell+cell/2,y:M.t-8,"text-anchor":"start",class:"axis-t",css:"font-size:11.5px",
+      transform:`rotate(-52 ${M.l+i*cell+cell/2} ${M.t-8})`,text:short(rk)},svg);
+    order.forEach((ck,j)=>{
+      const c=SW.cells[rk][ck], g=c.w+c.l+c.t, frac=g?(c.w+0.5*c.t)/g:0;
+      const x=M.l+j*cell, y=M.t+i*cell, diag=rk===ck;
+      const rect=S("rect",{x:x+1,y:y+1,width:cell-2,height:cell-2,rx:3,
+        fill:`var(--heat${bin(frac)})`,stroke:diag?"var(--ink)":"none","stroke-width":diag?1.6:0},svg);
+      S("text",{x:x+cell/2,y:y+cell/2+4,"text-anchor":"middle",
+        css:`font-size:11px;${diag?"font-weight:700;":""}fill:${bin(frac)>=4?"var(--surface)":"var(--ink-2)"}`,
+        text:`${c.w}-${c.l}${c.t?"-"+c.t:""}`},svg);
+      hover(rect, diag
+        ? `<b>${nm(rk)}</b> — actual record ${c.w}-${c.l}${c.t?"-"+c.t:""}`
+        : `<b>${nm(rk)}</b> with <b>${nm(ck)}</b>'s schedule: ${c.w}-${c.l}${c.t?"-"+c.t:""}`);
+    });
+  });
 })();
 </script>

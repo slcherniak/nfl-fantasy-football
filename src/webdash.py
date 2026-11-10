@@ -23,7 +23,7 @@ import pandas as pd
 
 from src import load
 from src.config import Settings
-from src.metrics import all_play, awards, efficiency, luck, power_rankings, volatility
+from src.metrics import all_play, awards, efficiency, fun, luck, power_rankings, volatility
 from src.simulate import simulate_playoff_odds
 
 TEMPLATE_PATH = Path(__file__).parent / "templates" / "dashboard.html"
@@ -302,6 +302,133 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
                               "swing": round(swing, 1), "flips": flips})
             txn_data["trades"].append({"week": wk0, "sides": sides})
 
+    # --- schedule swap, belt, bench crimes -----------------------------------
+    swap = fun.schedule_swap(matchups)
+    wins_actual = {k: swap[k][k]["w"] + 0.5 * swap[k][k]["t"] for k in swap}
+    swap_order = sorted(swap, key=lambda k: -wins_actual[k])
+    belt = fun.championship_belt(matchups)
+    crimes = fun.bench_crimes(rosters, settings.flex_eligibility, settings.non_starting_slots) \
+        if not rosters.empty else pd.DataFrame()
+    crime_data = {"perTeam": [], "thisWeek": []}
+    if not crimes.empty:
+        season_tot = crimes.groupby("team_key")["gain"].sum()
+        for k, g in crimes.groupby("team_key"):
+            worst = g.loc[g["gain"].idxmax()]
+            crime_data["perTeam"].append({
+                "key": k, "total": round(float(season_tot[k]), 1),
+                "worst": {"week": int(worst["week"]), "benched": worst["benched"],
+                          "benchedPts": worst["benched_pts"], "started": worst["started"],
+                          "startedPts": worst["started_pts"], "slot": worst["slot"],
+                          "gain": worst["gain"]},
+            })
+        crime_data["perTeam"].sort(key=lambda r: -r["total"])
+        week_c = crimes[crimes["week"] == latest].sort_values("gain", ascending=False)
+        crime_data["thisWeek"] = [
+            {"key": r.team_key, "benched": r.benched, "benchedPts": r.benched_pts,
+             "started": r.started, "startedPts": r.started_pts, "slot": r.slot, "gain": r.gain}
+            for r in week_c.head(5).itertuples()
+        ]
+
+    # --- this week's leverage (odds if win vs if lose next matchup) ----------
+    leverage = []
+    if not remaining.empty:
+        next_week = int(remaining["week"].min())
+        next_games = remaining[remaining["week"] == next_week]
+        pairs = {tuple(sorted((r.team_key, r.opp_key))) for r in next_games.itertuples()}
+        ppg_now = matchups.groupby("team_key")["points_for"].mean()
+        for a, b in sorted(pairs):
+            cond_odds = {}
+            for winner, loser in ((a, b), (b, a)):
+                synth = pd.DataFrame([
+                    {"week": next_week, "team_key": winner, "opp_key": loser,
+                     "points_for": float(ppg_now.get(winner, 100)) + 5,
+                     "points_against": float(ppg_now.get(loser, 100)) - 5,
+                     "result": "W", "is_playoffs": 0, "is_complete": 1},
+                    {"week": next_week, "team_key": loser, "opp_key": winner,
+                     "points_for": float(ppg_now.get(loser, 100)) - 5,
+                     "points_against": float(ppg_now.get(winner, 100)) + 5,
+                     "result": "L", "is_playoffs": 0, "is_complete": 1},
+                ])
+                cond = simulate_playoff_odds(
+                    pd.concat([matchups, synth], ignore_index=True),
+                    remaining[remaining["week"] > next_week],
+                    num_playoff_teams=int(playoff_cfg["num_playoff_teams"]),
+                    num_byes=int(playoff_cfg["num_byes"]),
+                    num_sims=1500, random_seed=ODDS_RACE_SEED,
+                ).set_index("team_key")["playoffs_odds"]
+                cond_odds[winner] = cond
+            for team, opp in ((a, b), (b, a)):
+                if_win = float(cond_odds[team].get(team, 0))
+                if_loss = float(cond_odds[opp].get(team, 0))
+                leverage.append({"key": team, "opp": opp, "week": next_week,
+                                 "ifWin": round(if_win, 3), "ifLoss": round(if_loss, 3),
+                                 "swing": round(if_win - if_loss, 3)})
+        leverage.sort(key=lambda r: -r["swing"])
+
+    # --- seed probability matrix ----------------------------------------------
+    seed_matrix = []
+    if final_odds is not None:
+        n_seeds = int(playoff_cfg["num_playoff_teams"])
+        for k in teams["team_key"]:
+            seed_matrix.append({"key": k, "seeds": [
+                round(float(final_odds.loc[k, f"seed{s}_odds"]), 3) for s in range(1, n_seeds + 1)
+            ]})
+        seed_matrix.sort(key=lambda r: -sum(r["seeds"]))
+
+    # --- power ranking history (retroactive bump chart) ------------------------
+    power_weeks, power_ranks = [], {k: [] for k in teams["team_key"]}
+    for w in range(2, latest + 1):
+        pw = power_rankings.power_rankings(
+            matchups[matchups["week"] <= w], settings.power_weights, settings.recent_weeks
+        ).set_index("team_key")["rank"]
+        power_weeks.append(w)
+        for k in teams["team_key"]:
+            power_ranks[k].append(int(pw.get(k, len(teams))))
+
+    # --- draft report card -------------------------------------------------------
+    draft = pd.read_sql_query("SELECT * FROM draft_picks ORDER BY overall", conn)
+    draft_card = None
+    if not draft.empty and not rosters.empty:
+        season_pts = rosters.groupby("player_key")["points"].sum()
+        draft["points"] = draft["player_key"].map(season_pts).fillna(0.0).round(1)
+        picks = [
+            {"overall": int(r.overall), "round": int(r.round), "player": r.player_name,
+             "position": r.position, "key": r.team_key, "points": float(r.points)}
+            for r in draft.itertuples()
+        ]
+        late = [p for p in picks if p["round"] >= 8]
+        early = [p for p in picks if p["round"] <= 3]
+        team_totals = draft.groupby("team_key")["points"].sum().round(1)
+        draft_card = {
+            "steals": sorted(late, key=lambda p: -p["points"])[:5],
+            "busts": sorted(early, key=lambda p: p["points"])[:5],
+            "teams": sorted(
+                [{"key": k, "points": float(v)} for k, v in team_totals.items()],
+                key=lambda r: -r["points"],
+            ),
+        }
+
+    # --- trade deadline war room (until Nov 28) ---------------------------------
+    war_room = None
+    if final_odds is not None and not rosters.empty and date.today() <= date(2026, 11, 28):
+        starters = rosters[~rosters.slot.isin(settings.non_starting_slots)].copy()
+        base_slot = starters[starters.slot.isin(["QB", "RB", "WR", "TE", "K", "DEF"])]
+        slot_avg = base_slot.groupby("slot")["points"].mean()
+        bubble = []
+        for k in teams["team_key"]:
+            odds_k = float(final_odds.loc[k, "playoffs_odds"])
+            if not (0.10 <= odds_k <= 0.90):
+                continue
+            own = base_slot[base_slot.team_key == k].groupby("slot")["points"].mean()
+            deficits = {s: float(own.get(s, 0) - slot_avg[s]) for s in slot_avg.index}
+            weak = min(deficits, key=deficits.get)
+            lev = next((l for l in leverage if l["key"] == k), None)
+            bubble.append({"key": k, "odds": round(odds_k, 3), "weakSlot": weak,
+                           "deficit": round(deficits[weak], 1),
+                           "swing": lev["swing"] if lev else None})
+        bubble.sort(key=lambda r: -r["odds"])
+        war_room = {"deadline": "Nov 28", "bubble": bubble}
+
     # --- latest-week awards ----------------------------------------------------
     week_m = matchups[matchups["week"] == latest]
     week_eff = eff_weekly[eff_weekly["week"] == latest] if not eff_weekly.empty else None
@@ -327,6 +454,14 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
         "weekly": {"weeks": [int(w) for w in weeks], "scores": weekly_scores, "median": medians},
         "oddsRace": {"weeks": race_weeks, "odds": race},
         "allPlay": {"order": order, "cells": cells},
+        "scheduleSwap": {"order": swap_order, "cells": swap},
+        "belt": belt,
+        "crimes": crime_data,
+        "leverage": leverage,
+        "seedMatrix": seed_matrix,
+        "powerHistory": {"weeks": power_weeks, "ranks": power_ranks},
+        "draftCard": draft_card,
+        "warRoom": war_room,
         "txns": txn_data,
         "tiles": tiles,
     }

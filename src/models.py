@@ -80,6 +80,17 @@ CREATE TABLE IF NOT EXISTS league_meta (
     key    TEXT PRIMARY KEY,
     value  TEXT
 );
+
+-- Draft results (static after draft day; scraped once).
+CREATE TABLE IF NOT EXISTS draft_picks (
+    overall      INTEGER PRIMARY KEY,
+    round        INTEGER NOT NULL,
+    pick         INTEGER NOT NULL,
+    team_key     TEXT NOT NULL,
+    player_key   TEXT,
+    player_name  TEXT,
+    position     TEXT
+);
 """
 
 
