@@ -1,0 +1,7 @@
+# Static deploy: only the pre-generated Film Room page in public/ is served.
+# Keep the Python ETL out of the upload so Vercel never tries to build it
+# as a serverless function (PYTHON_ENTRYPOINT_NOT_FOUND).
+*
+!public
+!public/**
+!vercel.json
