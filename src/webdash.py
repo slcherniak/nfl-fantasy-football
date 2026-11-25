@@ -448,8 +448,7 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
 
     # --- what-if playoff machine ----------------------------------------------
     # Exact enumeration data for the browser: remaining games, current wins
-    # (ties = 0.5), frozen PF, and each team's full-season opponent list for
-    # the opponents'-wins tiebreaker.
+    # (ties = 0.5), and frozen PF (the league's tiebreaker after record).
     wi_games, seen_pairs = [], set()
     for r in remaining.itertuples():
         pid = (int(r.week), tuple(sorted((str(r.team_key), str(r.opp_key)))))
@@ -458,16 +457,10 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
         seen_pairs.add(pid)
         wi_games.append({"week": pid[0], "a": pid[1][0], "b": pid[1][1]})
     wi_games.sort(key=lambda g: g["week"])
-    season_opps = {str(k): [] for k in teams["team_key"]}
-    for r in all_rows.itertuples():
-        k = str(r.team_key)
-        if k in season_opps and r.opp_key:
-            season_opps[k].append(str(r.opp_key))
     what_if = {
         "games": wi_games,
         "wins": {k: float(luck_df.loc[k, "actual_wins"]) for k in teams["team_key"]},
         "pf": {k: round(float(luck_df.loc[k, "points_for"]), 1) for k in teams["team_key"]},
-        "opps": season_opps,
     } if wi_games else None
 
     # --- latest-week awards ----------------------------------------------------
