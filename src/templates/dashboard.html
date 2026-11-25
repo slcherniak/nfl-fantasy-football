@@ -230,7 +230,7 @@ html{-webkit-text-size-adjust:100%}
 
 <section id="wifSec" data-tab="whatif" hidden>
   <div class="sec-head"><h2>The What-If Machine</h2></div>
-  <p class="sec-sub">Playoff math you can argue with. Pick winners for the remaining games — the field updates instantly, and unpicked games count both ways, every combination checked exactly (no simulation). Seeding uses the league's real tiebreakers: record, then opponents' wins, then points for (PF is frozen at today's totals, since future scores are unknowable).</p>
+  <p class="sec-sub">Playoff math you can argue with. Pick winners for the remaining games — the field updates instantly, and unpicked games count both ways, every combination checked exactly (no simulation). Seeding uses the league's real tiebreaker: record, then total points for (PF is frozen at today's totals, since future scores are unknowable).</p>
   <div id="wifGames" class="wif-games"></div>
   <div class="tablewrap"><table id="wifTable"></table></div>
   <h3 class="sub-h" id="wifPathsHead" style="margin-top:18px">Paths for the bubble</h3>
@@ -885,8 +885,6 @@ scatter("rangeQuad", DATA.rangeQuad, {
   const G=WI.games.map(g=>({week:g.week,a:idx[g.a],b:idx[g.b]}));
   const baseW=new Float64Array(N), PF=new Float64Array(N);
   keys.forEach((k,i)=>{baseW[i]=WI.wins[k]; PF[i]=WI.pf[k];});
-  const OPP=new Int8Array(N*N);  // OPP[i*N+j] = times i faces j all season
-  keys.forEach((k,i)=>{ for(const o of (WI.opps[k]||[])){ const j=idx[o]; if(j!=null) OPP[i*N+j]++; }});
   const NP=DATA.numPlayoffTeams, NB=2;
   const recOf={}; for(const r of DATA.standings) recOf[r.key]=r.record;
   const state=new Array(G.length).fill(0);  // 0 open · 1 a wins · 2 b wins
@@ -907,18 +905,18 @@ scatter("rangeQuad", DATA.rangeQuad, {
     const inC=new Float64Array(N), byeC=new Float64Array(N), woIn=new Float64Array(N);
     const afford=new Int8Array(N).fill(-1);            // most own losses survived
     const rival=new Float64Array(N*N);                 // [firstOut][lastIn] at the cut
-    const cutTieW=new Float64Array(N), cutTiePF=new Float64Array(N), cutN=new Float64Array(N);
+    const cutTieW=new Float64Array(N), cutN=new Float64Array(N);
     // per-team win-out conditionals per open game & side: what to root for
     const woG=new Float64Array(N*F*2), woGin=new Float64Array(N*F*2);
-    const w=new Float64Array(N), ow=new Float64Array(N), order=new Int32Array(N);
+    const w=new Float64Array(N), order=new Int32Array(N);
     const inSet=new Uint8Array(N);
     for(let m=0;m<total;m++){
       w.set(w0);
       for(let b=0;b<F;b++){ const g=G[free[b]]; if((m>>b)&1) w[g.a]++; else w[g.b]++; }
-      for(let i=0;i<N;i++){ let s=0; const r=i*N; for(let j=0;j<N;j++) s+=OPP[r+j]*w[j]; ow[i]=s; order[i]=i; }
-      for(let i=1;i<N;i++){ const v=order[i]; let j=i-1;      // sort: W, oppW, PF
+      for(let i=0;i<N;i++) order[i]=i;
+      for(let i=1;i<N;i++){ const v=order[i]; let j=i-1;      // sort: wins, then PF
         while(j>=0){ const u=order[j];
-          if((w[u]-w[v] || ow[u]-ow[v] || PF[u]-PF[v])<0){ order[j+1]=u; j--; } else break; }
+          if((w[u]-w[v] || PF[u]-PF[v])<0){ order[j+1]=u; j--; } else break; }
         order[j+1]=v; }
       inSet.fill(0);
       for(let s=0;s<NP;s++){ const t=order[s]; inSet[t]=1; inC[t]++; if(s<NB) byeC[t]++;
@@ -926,7 +924,7 @@ scatter("rangeQuad", DATA.rangeQuad, {
         if(lost>afford[t]) afford[t]=lost; }
       const lastIn=order[NP-1], firstOut=order[NP];
       rival[firstOut*N+lastIn]++; cutN[firstOut]++;
-      if(w[firstOut]===w[lastIn]){ cutTieW[firstOut]++; if(ow[firstOut]===ow[lastIn]) cutTiePF[firstOut]++; }
+      if(w[firstOut]===w[lastIn]) cutTieW[firstOut]++;
       for(let t=0;t<N;t++){
         if((m&needSet[t])===needSet[t] && (m&needClear[t])===0){
           if(inSet[t]) woIn[t]++;
@@ -940,7 +938,7 @@ scatter("rangeQuad", DATA.rangeQuad, {
             woP:i=>woIn[i]/(total>>ownFree[i]),
             afford:i=>afford[i],
             rivalOf:i=>{ let best=-1,bc=0; for(let j=0;j<N;j++){ const c=rival[i*N+j]; if(c>bc){bc=c;best=j;} }
-                         return best<0?null:{j:best, share:bc/(cutN[i]||1), tieW:cutTieW[i]/(cutN[i]||1), tiePF:cutTiePF[i]/(cutN[i]||1)}; },
+                         return best<0?null:{j:best, share:bc/(cutN[i]||1), tieW:cutTieW[i]/(cutN[i]||1)}; },
             woCond:(i,b,side)=>{ const k=i*F*2+b*2+side; return woG[k]?woGin[k]/woG[k]:null; }};
   }
 
@@ -975,10 +973,8 @@ scatter("rangeQuad", DATA.rangeQuad, {
       const t=p[2]?`-${p[2]}`:"";
       if(!pw[i]&&!pl[i]) return `${p[0]}-${p[1]}${t}`;
       return `${p[0]}-${p[1]}${t} <span style="color:var(--muted)">→</span> <b>${p[0]+pw[i]}-${p[1]+pl[i]}${t}</b>`; };
-    // opponents' wins and wins as of the current picks, for tiebreak prose
+    // wins as of the current picks, for sorting
     const wNow=Float64Array.from(baseW); for(let i=0;i<N;i++) wNow[i]+=pw[i];
-    const owNow=new Float64Array(N);
-    for(let i=0;i<N;i++){ let s=0; for(let j=0;j<N;j++) s+=OPP[i*N+j]*wNow[j]; owNow[i]=s; }
     const rows=keys.map((k,i)=>({k,i,in:res.inP(i),bye:res.byeP(i),wo:res.woP(i)}))
       .sort((x,y)=> y.in-x.in || wNow[y.i]-wNow[x.i] || PF[y.i]-PF[x.i]);
     tbl.innerHTML=`<thead><tr><th class="l">Team</th><th>Record</th><th>Playoffs</th><th>Bye</th><th>Win out</th><th class="l">The read</th></tr></thead>`;
@@ -1030,13 +1026,10 @@ scatter("rangeQuad", DATA.rangeQuad, {
         const j=rv.j, R=tshort(keys[j],16);
         let tb2=`the last spot most often comes down to <b>${R}</b>`;
         if(rv.tieW>0.15){
-          tb2+=` — a record tie breaks on opponents' wins (${owNow[i]} vs ${owNow[j]} as picked)`;
-          if(rv.tiePF>0.05){
-            const gap=Math.abs(PF[i]-PF[j]).toFixed(1);
-            tb2+= PF[i]>PF[j]
-              ? `, then total points, where they hold a ${gap}-point cushion (${PF[i]} vs ${PF[j]})`
-              : `, then total points, where they'd need to outscore ${R} by ${gap} the rest of the way (${PF[i]} vs ${PF[j]})`;
-          }
+          const gap=Math.abs(PF[i]-PF[j]).toFixed(1);
+          tb2+= PF[i]>PF[j]
+            ? ` — a record tie breaks on total points, where they hold a ${gap}-point cushion (${PF[i]} vs ${PF[j]})`
+            : ` — a record tie breaks on total points, where they'd need to outscore ${R} by ${gap} the rest of the way (${PF[i]} vs ${PF[j]})`;
         }
         bits.push(tb2);
       }

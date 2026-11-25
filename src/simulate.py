@@ -5,11 +5,9 @@ Normal(season PPG, season sigma), plays out the actual remaining schedule,
 seeds the configured number of playoff teams by record, and runs a fixed
 (no-reseed) bracket where the top `num_byes` seeds skip the first round.
 
-Seeding tiebreaks, in order (mirroring the league's "record vs opponent
-wins" setting as closely as season data allows):
+Seeding tiebreaks, in order (the league's setting):
   1. win percentage
-  2. total wins by opponents faced (strength of record)
-  3. total points for (Yahoo's fallback)
+  2. total points for
 
 Bracket for 6 teams / 2 byes (no reseeding):
   Round 1: 3v6, 4v5 (1 and 2 idle)
@@ -38,15 +36,6 @@ def _team_stats(completed: pd.DataFrame) -> pd.DataFrame:
     return stats
 
 
-def _opponent_wins(completed: pd.DataFrame, wins: dict[str, float], extra_opponents: dict[str, list[str]]) -> dict[str, float]:
-    totals: dict[str, float] = {}
-    faced = completed.groupby("team_key")["opp_key"].apply(list).to_dict()
-    for team in wins:
-        opponents = list(faced.get(team, [])) + extra_opponents.get(team, [])
-        totals[team] = sum(wins.get(o, 0.0) for o in opponents)
-    return totals
-
-
 def simulate_playoff_odds(
     completed: pd.DataFrame,
     remaining_schedule: pd.DataFrame,
@@ -69,11 +58,6 @@ def simulate_playoff_odds(
         for row in remaining_schedule.itertuples()
         if row.team_key < row.opp_key and row.team_key in idx and row.opp_key in idx
     ]
-    future_opponents: dict[str, list[str]] = {t: [] for t in teams}
-    for _, a, b in games:
-        future_opponents[a].append(b)
-        future_opponents[b].append(a)
-
     ppg = stats["ppg"].to_numpy()
     sigma = stats["sigma"].to_numpy()
     base_wins = stats["wins"].to_numpy()
@@ -104,11 +88,9 @@ def simulate_playoff_odds(
                 wins[ia] += 0.5
                 wins[ib] += 0.5
 
-        wins_by_team = {t: wins[idx[t]] for t in teams}
-        opp_wins = _opponent_wins(completed, wins_by_team, future_opponents)
         seed_order = sorted(
             teams,
-            key=lambda t: (-wins[idx[t]], -opp_wins[t], -pf[idx[t]]),
+            key=lambda t: (-wins[idx[t]], -pf[idx[t]]),
         )
         seeds = seed_order[:num_playoff_teams]
         for seed_pos, t in enumerate(seeds):

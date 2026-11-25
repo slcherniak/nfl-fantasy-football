@@ -11,8 +11,9 @@ rankings, and manager-skill metrics beyond the Yahoo standings page.
 - **Roster:** QB, RB, RB, WR, WR, TE, W/R/T, K, DEF, 6 BN, 1 IR
 - **Waivers:** FAAB, weekly Tue. Budget is **auto-detected** from the API,
   never hardcoded (likely $100, not shown in settings)
-- **Playoffs:** 6 teams, Weeks 15–17, seeding by record (tiebreak = record vs
-  opponent wins), **no reseeding**, top 2 seeds get Week 15 byes
+- **Playoffs:** 6 teams, Weeks 15–17, seeding by record (tiebreak = total
+  points for — confirmed by the commissioner), **no reseeding**, top 2 seeds
+  get Week 15 byes
 - **Trades:** deadline Nov 28, 2026; no review
 - **Team count:** settings allow 14 — **auto-detected at runtime**
   (`num_teams`); a mismatch vs `config.yaml:league.expected_num_teams` logs a
@@ -85,7 +86,7 @@ idempotent and doubles as the Thursday stat-correction refresh.
 - **SOS:** average opponent PPG faced, excluding the opponent's games vs the
   team being measured; remaining SOS from the stored future schedule.
 - **Playoff odds:** 10k Monte Carlo sims, scores ~ Normal(PPG, σ), actual
-  remaining schedule, 6 seeds by record (tiebreak: opponents' wins, then PF),
+  remaining schedule, 6 seeds by record (tiebreak: points for),
   no reseed, top-2 byes. Reports playoff/bye/finals/title odds and the
   bracket-path split (`finals_from_bye` vs `finals_from_round1`).
 
