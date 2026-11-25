@@ -98,9 +98,14 @@ ul.plain{list-style:none;margin:6px 0 0;padding:0;font-size:13px;color:var(--ink
 ul.plain b{color:var(--ink)}
 [hidden]{display:none!important}
 /* tabs */
-.tabs{position:sticky;top:0;z-index:6;display:flex;gap:8px;background:var(--bg);padding:10px 0;margin:0 0 8px;border-bottom:1px solid var(--grid)}
-.tabs button{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:14px;padding:7px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.tabs{position:sticky;top:0;z-index:6;display:flex;gap:8px;background:var(--bg);padding:10px 0;margin:0 0 8px;border-bottom:1px solid var(--grid);overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:none;font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:14px;padding:7px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.heat-legend{display:flex;align-items:center;gap:3px;margin:10px 4px 8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
+.heat-legend i{width:20px;height:10px;border-radius:2px;display:inline-block}
+.heat-legend span{margin-inline:5px}
 
 /* what-if machine */
 .wif-week{margin:12px 0 5px;font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
@@ -153,35 +158,39 @@ html{-webkit-text-size-adjust:100%}
   <span class="eyebrow">Man Camp &middot; 2026 Season</span>
   <h1>The Film Room</h1>
 </header>
-<nav id="tabs" class="tabs" hidden>
-  <button data-tab="film" class="on">The Film Room</button>
-  <button data-tab="whatif">What-If Machine</button>
+<nav id="tabs" class="tabs" role="tablist" aria-label="Film Room sections">
+  <button role="tab" data-tab="pulse" class="on">Pulse</button>
+  <button role="tab" data-tab="playoffs">Playoffs</button>
+  <button role="tab" data-tab="managers">Managers</button>
+  <button role="tab" data-tab="market">Market</button>
+  <button role="tab" data-tab="rivalries">Rivalries</button>
+  <button role="tab" data-tab="whatif">What-If</button>
 </nav>
 <p class="subline" id="subline"></p>
 
-<div class="cardgrid" id="tiles"></div>
-<div class="legend" id="legend"></div>
+<div class="cardgrid" id="tiles" data-tab="pulse"></div>
+<div class="legend" id="legend" data-tab="pulse"></div>
 
-<div class="belt" id="belt" hidden>
+<div class="belt" id="belt" data-tab="pulse" hidden>
   <div class="belt-main"><span class="belt-icon">🏆</span>
     <div><div class="lbl">The Man Camp Belt · lineal title, lost only head-to-head</div>
     <div class="belt-holder" id="beltHolder"></div></div></div>
   <div class="belt-lineage" id="beltLineage"></div>
 </div>
 
-<section>
+<section data-tab="pulse">
   <div class="sec-head"><h2>Standings, Adjusted for Reality</h2></div>
   <p class="sec-sub">Record is what the schedule gave you. All-Play is your record if you'd faced all 11 opponents every week — the schedule-proof version. Luck is actual wins minus the wins all-play says you earned. Odds come from 10,000 simulated season endings.</p>
   <div class="tablewrap"><table id="standings"></table></div>
 </section>
 
-<section>
+<section data-tab="pulse">
   <div class="sec-head"><h2>The Luck Quadrant</h2></div>
   <p class="sec-sub">Expected wins (from all-play scoring) against actual wins. On the diagonal, the standings tell the truth. Above it, the schedule has been kind; below it, you've been robbed.</p>
   <div class="chart-card"><div class="scrollwrap"><svg id="luckQuad"></svg></div></div>
 </section>
 
-<section class="duo">
+<section class="duo" data-tab="managers">
   <div>
     <div class="sec-head"><h2>Rosters vs Managers</h2></div>
     <p class="sec-sub">Best possible points per week (roster strength) against the share of it the lineup actually captured. Right side drafted well; top edge sets the lineup well.</p>
@@ -194,19 +203,19 @@ html{-webkit-text-size-adjust:100%}
   </div>
 </section>
 
-<section>
+<section data-tab="managers">
   <div class="sec-head"><h2>Scoring Distributions</h2></div>
   <p class="sec-sub">Every week each team has played, one dot per game. The bar spans their floor to their ceiling; the notch is their median. The dashed line is the league median.</p>
   <div class="chart-card"><div class="scrollwrap"><svg id="strips"></svg></div></div>
 </section>
 
-<section>
+<section data-tab="pulse">
   <div class="sec-head"><h2>The Playoff Odds Race</h2></div>
   <p class="sec-sub">Playoff probability recomputed after every completed week, each time simulating the rest of the season 3,000 times from that point's records and scoring profiles.</p>
   <div class="chart-card"><div class="scrollwrap"><svg id="race"></svg></div></div>
 </section>
 
-<section class="duo">
+<section class="duo" data-tab="playoffs">
   <div>
     <div class="sec-head"><h2>This Week's Leverage</h2></div>
     <p class="sec-sub">What the next matchup is worth: playoff odds if you win vs if you lose, simulated both ways. The longer the bar, the bigger the game.</p>
@@ -219,7 +228,7 @@ html{-webkit-text-size-adjust:100%}
   </div>
 </section>
 
-<section id="wifSec" hidden>
+<section id="wifSec" data-tab="whatif" hidden>
   <div class="sec-head"><h2>The What-If Machine</h2></div>
   <p class="sec-sub">Playoff math you can argue with. Pick winners for the remaining games — the field updates instantly, and unpicked games count both ways, every combination checked exactly (no simulation). Seeding uses the league's real tiebreakers: record, then opponents' wins, then points for (PF is frozen at today's totals, since future scores are unknowable).</p>
   <div id="wifGames" class="wif-games"></div>
@@ -228,26 +237,26 @@ html{-webkit-text-size-adjust:100%}
   <div id="wifPaths" class="wif-paths"></div>
 </section>
 
-<section>
+<section data-tab="managers">
   <div class="sec-head"><h2>Week-by-Week Trajectories</h2></div>
   <p class="sec-sub">Each team against the league median (dashed). Same scale everywhere, so shapes compare honestly.</p>
   <div class="mult-grid" id="multiples"></div>
 </section>
 
-<section>
+<section data-tab="managers">
   <div class="sec-head"><h2>Power Rank History</h2></div>
   <p class="sec-sub">The composite power ranking recomputed after every week. Rank 1 at the top — watch the collapses.</p>
   <div class="chart-card"><div class="scrollwrap"><svg id="powerHist"></svg></div></div>
 </section>
 
-<section>
+<section data-tab="managers">
   <div class="sec-head"><h2>Bench Crimes</h2></div>
   <p class="sec-sub">The single worst legal start/sit call each week — the one bench player who should have been in, by name. Totals are cumulative points lost to the worst weekly call.</p>
   <div class="chart-card"><div class="scrollwrap"><svg id="crimes"></svg></div></div>
   <div id="crimeWeek" class="sec-sub" style="margin-top:10px"></div>
 </section>
 
-<section>
+<section data-tab="market">
   <div class="sec-head"><h2>The Transaction Desk</h2></div>
   <p class="sec-sub">Every move graded by what the player actually scored <em>in the lineup</em> after it — points rotting on the bench don't count. Re-graded automatically each week.</p>
   <div class="duo">
@@ -267,7 +276,7 @@ html{-webkit-text-size-adjust:100%}
   <div id="trades" class="trades"></div>
 </section>
 
-<section id="draftSec" hidden>
+<section id="draftSec" data-tab="market" hidden>
   <div class="sec-head"><h2>Draft Report Card</h2></div>
   <p class="sec-sub">Every pick graded by the player's total season points, wherever they ended up. Steals are round 8+; busts are rounds 1–3.</p>
   <div class="duo">
@@ -277,22 +286,24 @@ html{-webkit-text-size-adjust:100%}
   </div>
 </section>
 
-<section id="warSec" hidden>
+<section id="warSec" data-tab="playoffs" hidden>
   <div class="sec-head"><h2>Deadline War Room</h2></div>
   <p class="sec-sub" id="warSub"></p>
   <div id="warCards" class="trades"></div>
 </section>
 
-<section>
+<section data-tab="rivalries">
   <div class="sec-head"><h2>All-Play Domination Grid</h2></div>
   <p class="sec-sub">Row team's weekly-score record against each column team across every week, even when they never met. Darker means more dominant. Teams ordered by all-play wins.</p>
-  <div class="chart-card"><div class="scrollwrap"><svg id="heat"></svg></div></div>
+  <div class="chart-card"><div class="scrollwrap"><svg id="heat"></svg></div>
+  <div class="heat-legend" aria-hidden="true"><span>rarely outscores</span><i style="background:var(--heat0)"></i><i style="background:var(--heat1)"></i><i style="background:var(--heat2)"></i><i style="background:var(--heat3)"></i><i style="background:var(--heat4)"></i><i style="background:var(--heat5)"></i><i style="background:var(--heat6)"></i><span>always outscores</span></div></div>
 </section>
 
-<section>
+<section data-tab="rivalries">
   <div class="sec-head"><h2>If You Had Their Schedule</h2></div>
   <p class="sec-sub">Each row team's weekly scores replayed against each column team's actual schedule (facing the column team where they'd meet themselves). The diagonal is reality. The argument-ender.</p>
-  <div class="chart-card"><div class="scrollwrap"><svg id="swap"></svg></div></div>
+  <div class="chart-card"><div class="scrollwrap"><svg id="swap"></svg></div>
+  <div class="heat-legend" aria-hidden="true"><span>losing record</span><i style="background:var(--heat0)"></i><i style="background:var(--heat1)"></i><i style="background:var(--heat2)"></i><i style="background:var(--heat3)"></i><i style="background:var(--heat4)"></i><i style="background:var(--heat5)"></i><i style="background:var(--heat6)"></i><span>winning record</span></div></div>
 </section>
 
 <footer id="foot"></footer>
@@ -332,7 +343,7 @@ function hover(el, html){
 
 /* header, tiles, legend, footer */
 document.getElementById("subline").textContent =
-  `Luck-adjusted standings, manager skill, and playoff math for a 12-team league · through Week ${DATA.asOfWeek}`;
+  `Luck-adjusted standings, manager skill, and playoff math for a 12-team league · through Week ${DATA.asOfWeek} · hover or tap any mark for the story`;
 const tileBox = document.getElementById("tiles");
 for(const t of Object.values(DATA.tiles)){
   const d=document.createElement("div"); d.className="tile";
@@ -1037,29 +1048,37 @@ scatter("rangeQuad", DATA.rangeQuad, {
   render();
 })();
 
-/* ---- tabs: Film Room vs What-If Machine ----
+/* ---- tabs ----
    Runs last so it can snapshot which sections hid themselves for lack of
-   data and restore exactly that state when switching back. */
+   data and restore exactly that state when their tab shows. Elements
+   without data-tab (masthead, subline, nav, footer) show on every tab. */
 (function(){
-  const nav=document.getElementById("tabs"), wif=document.getElementById("wifSec");
+  const nav=document.getElementById("tabs");
   if(!nav) return;
-  if(!(DATA.whatIf&&DATA.whatIf.games.length)) return;   // nothing to tab
-  nav.hidden=false;
+  const TABS=["pulse","playoffs","managers","market","rivalries","whatif"];
+  // hide tabs with nothing to show (e.g. What-If after the season ends)
+  if(!(DATA.whatIf&&DATA.whatIf.games.length)){
+    const b=nav.querySelector('button[data-tab="whatif"]'); if(b) b.remove();
+  }
   const wrap=document.querySelector(".wrap");
   const baseHidden=new Map();
   for(const el of wrap.children) baseHidden.set(el, el.hidden);
   function setTab(t){
+    if(!TABS.includes(t)) t="pulse";
     for(const el of wrap.children){
-      if(el.tagName==="HEADER"||el===nav) continue;
-      if(el===wif) el.hidden = t==="whatif" ? baseHidden.get(el) : true;
-      else el.hidden = t==="whatif" ? true : baseHidden.get(el);
+      const tab=el.dataset?el.dataset.tab:null;
+      if(!tab) continue;                               // shared chrome stays
+      el.hidden = tab===t ? baseHidden.get(el) : true;
     }
-    nav.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
-    try{ history.replaceState(null,"", t==="whatif"?"#whatif":location.pathname+location.search); }catch(e){}
+    nav.querySelectorAll("button").forEach(b=>{
+      const on=b.dataset.tab===t;
+      b.classList.toggle("on",on); b.setAttribute("aria-selected",on?"true":"false");
+    });
+    try{ history.replaceState(null,"", t==="pulse"?location.pathname+location.search:"#"+t); }catch(e){}
     window.scrollTo(0,0);
   }
   nav.querySelectorAll("button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
-  setTab(location.hash==="#whatif"?"whatif":"film");
+  setTab((location.hash||"").replace("#",""));
 })();
 </script>
 </body>
