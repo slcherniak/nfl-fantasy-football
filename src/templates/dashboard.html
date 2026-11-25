@@ -96,6 +96,16 @@ td .dot{display:inline-block;margin-right:7px;vertical-align:1px}
 .belt-lineage .chip{border:1px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap}
 ul.plain{list-style:none;margin:6px 0 0;padding:0;font-size:13px;color:var(--ink-2);display:grid;gap:5px}
 ul.plain b{color:var(--ink)}
+/* what-if machine */
+.wif-week{margin:12px 0 5px;font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.wif-row{display:flex;flex-wrap:wrap;gap:8px}
+.wif-g{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:999px;background:var(--surface);overflow:hidden}
+.wif-g button{font:inherit;font-size:12.5px;padding:5px 11px;border:0;background:none;color:var(--ink-2);cursor:pointer;white-space:nowrap}
+.wif-g button.on{background:var(--ink);color:var(--bg);font-weight:700}
+.wif-g .vs{font-size:10px;color:var(--muted);padding:0 1px}
+.wif-note{font-size:13px;color:var(--ink-2)}
+.badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;padding:2px 6px}
+.badge.in{background:var(--good);color:var(--surface)} .badge.out{background:var(--bad);color:var(--surface)}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;line-height:1.35;padding:7px 10px;border-radius:5px;max-width:260px;z-index:10;opacity:0;transition:opacity .08s}
 footer{margin-top:48px;border-top:1px solid var(--line);padding-top:14px;color:var(--muted);font-size:13px}
 svg text{font-family:var(--body)}
@@ -196,6 +206,13 @@ html{-webkit-text-size-adjust:100%}
   </div>
 </section>
 
+<section id="wifSec" hidden>
+  <div class="sec-head"><h2>The What-If Machine</h2></div>
+  <p class="sec-sub">Playoff math you can argue with. Pick winners for the remaining games — the field updates instantly, and unpicked games count both ways, every combination checked exactly (no simulation). Seeding uses the league's real tiebreakers: record, then opponents' wins, then points for (PF is frozen at today's totals, since future scores are unknowable).</p>
+  <div id="wifGames" class="wif-games"></div>
+  <div class="tablewrap"><table id="wifTable"></table></div>
+</section>
+
 <section>
   <div class="sec-head"><h2>Week-by-Week Trajectories</h2></div>
   <p class="sec-sub">Each team against the league median (dashed). Same scale everywhere, so shapes compare honestly.</p>
@@ -230,7 +247,7 @@ html{-webkit-text-size-adjust:100%}
       <div class="chart-card"><div class="scrollwrap"><svg id="faabRoi"></svg></div></div>
     </div>
   </div>
-  <h3 class="sub-h" style="margin-top:18px">Trade scoreboard</h3>
+  <h3 class="sub-h" style="margin-top:18px">Trade scoreboard <span style="font-family:var(--body);font-weight:400;font-size:13px;color:var(--muted);text-transform:none;letter-spacing:0">· most consequential first — flipped wins, then counterfactual points swung</span></h3>
   <p class="sec-sub">Each card shows started points from the players received, plus the <b>what-if verdict</b>: a replay of every week since the deal with the trade undone (optimal lineups in both worlds). Positive means the trade made that roster better than the no-trade world.</p>
   <div id="trades" class="trades"></div>
 </section>
@@ -831,6 +848,95 @@ scatter("rangeQuad", DATA.rangeQuad, {
         : `<b>${nm(rk)}</b> with <b>${nm(ck)}</b>'s schedule: ${c.w}-${c.l}${c.t?"-"+c.t:""}`);
     });
   });
+})();
+
+/* ---- the what-if machine ---- */
+(function(){
+  const WI=DATA.whatIf; if(!WI||!WI.games.length) return;
+  document.getElementById("wifSec").hidden=false;
+  const keys=DATA.teams.map(t=>t.key), N=keys.length;
+  const idx={}; keys.forEach((k,i)=>idx[k]=i);
+  const G=WI.games.map(g=>({week:g.week,a:idx[g.a],b:idx[g.b]}));
+  const baseW=new Float64Array(N), PF=new Float64Array(N);
+  keys.forEach((k,i)=>{baseW[i]=WI.wins[k]; PF[i]=WI.pf[k];});
+  const OPP=new Int8Array(N*N);  // OPP[i*N+j] = times i faces j all season
+  keys.forEach((k,i)=>{ for(const o of (WI.opps[k]||[])){ const j=idx[o]; if(j!=null) OPP[i*N+j]++; }});
+  const NP=DATA.numPlayoffTeams, NB=2;
+  const recOf={}; for(const r of DATA.standings) recOf[r.key]=r.record;
+  const state=new Array(G.length).fill(0);  // 0 open · 1 a wins · 2 b wins
+
+  function compute(){
+    const w0=Float64Array.from(baseW), free=[];
+    state.forEach((s,gi)=>{ if(s===1) w0[G[gi].a]++; else if(s===2) w0[G[gi].b]++; else free.push(gi); });
+    const F=free.length;
+    if(F>20) return null;                       // 2^20 is the sanity cap
+    const total=1<<F;
+    // "wins out" bitmasks per team over the open games
+    const needSet=new Int32Array(N), needClear=new Int32Array(N), ownFree=new Int32Array(N);
+    free.forEach((gi,b)=>{ const g=G[gi];
+      needSet[g.a]|=1<<b; ownFree[g.a]++;
+      needClear[g.b]|=1<<b; ownFree[g.b]++; });
+    const inC=new Float64Array(N), byeC=new Float64Array(N), woIn=new Float64Array(N);
+    const w=new Float64Array(N), ow=new Float64Array(N), order=new Int32Array(N);
+    for(let m=0;m<total;m++){
+      w.set(w0);
+      for(let b=0;b<F;b++){ const g=G[free[b]]; if((m>>b)&1) w[g.a]++; else w[g.b]++; }
+      for(let i=0;i<N;i++){ let s=0; const r=i*N; for(let j=0;j<N;j++) s+=OPP[r+j]*w[j]; ow[i]=s; order[i]=i; }
+      for(let i=1;i<N;i++){ const v=order[i]; let j=i-1;      // sort: W, oppW, PF
+        while(j>=0){ const u=order[j];
+          if((w[u]-w[v] || ow[u]-ow[v] || PF[u]-PF[v])<0){ order[j+1]=u; j--; } else break; }
+        order[j+1]=v; }
+      for(let s=0;s<NP;s++){ const t=order[s]; inC[t]++; if(s<NB) byeC[t]++;
+        if((m&needSet[t])===needSet[t] && (m&needClear[t])===0) woIn[t]++; }
+    }
+    return {total, inP:i=>inC[i]/total, byeP:i=>byeC[i]/total,
+            woP:i=>woIn[i]/(total>>ownFree[i]) };
+  }
+
+  function render(){
+    const box=document.getElementById("wifGames"); box.innerHTML="";
+    let lastWeek=0, row=null;
+    G.forEach((g,gi)=>{
+      if(WI.games[gi].week!==lastWeek){ lastWeek=WI.games[gi].week;
+        const h=document.createElement("div"); h.className="wif-week"; h.textContent="Week "+lastWeek+" — tap a team to hand it the win"; box.appendChild(h);
+        row=document.createElement("div"); row.className="wif-row"; box.appendChild(row); }
+      const d=document.createElement("div"); d.className="wif-g";
+      const mk=(ti,st)=>{ const b=document.createElement("button");
+        b.innerHTML=`<span class="dot" style="background:${cv(keys[ti])};width:8px;height:8px;display:inline-block;border-radius:50%;margin-right:5px"></span>${tshort(keys[ti],11)}`;
+        if(state[gi]===st) b.classList.add("on");
+        b.onclick=()=>{ state[gi]=(state[gi]===st?0:st); render(); };
+        return b; };
+      d.appendChild(mk(g.a,1));
+      const vs=document.createElement("span"); vs.className="vs"; vs.textContent="vs"; d.appendChild(vs);
+      d.appendChild(mk(g.b,2));
+      row.appendChild(d);
+    });
+    const res=compute();
+    const tbl=document.getElementById("wifTable");
+    if(!res){ tbl.innerHTML=`<tbody><tr><td class="l wif-note">Too many open games to enumerate — pick a few winners first.</td></tr></tbody>`; return; }
+    const rows=keys.map((k,i)=>({k,i,in:res.inP(i),bye:res.byeP(i),wo:res.woP(i)}))
+      .sort((x,y)=> y.in-x.in || baseW[y.i]-baseW[x.i] || PF[y.i]-PF[x.i]);
+    tbl.innerHTML=`<thead><tr><th class="l">Team</th><th>Record</th><th>Playoffs</th><th>Bye</th><th>Win out</th><th class="l">The read</th></tr></thead>`;
+    const tb=document.createElement("tbody");
+    const fmt=p=>p>=1?"100%":p<=0?"0%":(p*100).toFixed(p<0.1||p>0.99?1:0)+"%";
+    for(const r of rows){
+      const read = r.in>=1
+          ? `<span class="badge in">Clinched</span>${r.bye>=1?" · bye locked":r.bye>0?` · ${fmt(r.bye)} for a bye`:""}`
+        : r.in<=0 ? `<span class="badge out">Eliminated</span>`
+        : r.wo>=1 ? `Controls its fate — win out and it's in`
+        : r.wo<=0 ? `Out even winning out under these picks`
+        : `Win out → in ${fmt(r.wo)} of the rest — needs help`;
+      const tr=document.createElement("tr");
+      tr.innerHTML=`<td class="l"><span class="dot" style="background:${cv(r.k)}"></span>${nm(r.k)}</td>
+        <td>${recOf[r.k]||""}</td>
+        <td class="${r.in>=1?"pos":r.in<=0?"neg":""}">${fmt(r.in)}</td>
+        <td>${fmt(r.bye)}</td><td>${fmt(r.wo)}</td>
+        <td class="l wif-note">${read}</td>`;
+      tb.appendChild(tr);
+    }
+    tbl.appendChild(tb);
+  }
+  render();
 })();
 </script>
 </body>
