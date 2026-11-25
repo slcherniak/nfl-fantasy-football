@@ -108,7 +108,8 @@ svg text{font-family:var(--body)}
 /* ---- phone layout ---- */
 html{-webkit-text-size-adjust:100%}
 @media(max-width:640px){
-  .wrap{padding-inline:14px;padding-block:20px 44px}
+  .wrap{padding-inline:10px;padding-block:20px 44px}
+  .chart-card{padding:12px 6px 4px}
   section{margin-top:30px}
   h2{font-size:23px}
   .subline{font-size:14px;margin-bottom:20px}
@@ -348,7 +349,7 @@ function scatter(id, pts, opt){
      below 620px of card width, shrink the viewBox so text renders 1:1. */
   const avail=(svg.closest(".scrollwrap")||svg.parentNode).clientWidth||660;
   const W=avail<620?Math.max(350,avail):660, H=W<620?440:470,
-        M=W<620?{l:46,r:96,t:30,b:44}:{l:62,r:116,t:34,b:46};
+        M=W<620?{l:42,r:88,t:30,b:44}:{l:62,r:116,t:34,b:46};
   if(W<620) svg.classList.add("fit");
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const xs=pts.map(p=>p.x), ys=pts.map(p=>p.y);
@@ -449,7 +450,7 @@ scatter("rangeQuad", DATA.rangeQuad, {
   const leagueMed=(a=>{const s=[...a].sort((p,q)=>p-q);return (s[(s.length-1)>>1]+s[s.length>>1])/2;})(all);
   const svg=document.getElementById("strips");
   const W=fitW(svg,660), FIT=W<620;
-  const RH=30, M={l:FIT?92:150,r:FIT?20:28,t:26,b:40}, H=M.t+M.b+rows.length*RH;
+  const RH=30, M={l:FIT?84:150,r:FIT?16:28,t:26,b:40}, H=M.t+M.b+rows.length*RH;
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const X=v=>M.l+(v-lo)/(hi-lo)*(W-M.l-M.r);
   const step=FIT?50:25;
@@ -479,8 +480,8 @@ scatter("rangeQuad", DATA.rangeQuad, {
   const wk=DATA.oddsRace.weeks; if(!wk.length) return;
   const svg=document.getElementById("race");
   const W=fitW(svg,660), FIT=W<620;
-  const H=420,M={l:FIT?40:56,r:FIT?86:175,t:20,b:44};
-  const rshort=k=>tshort(k,FIT?9:13);
+  const H=420,M={l:FIT?36:56,r:FIT?74:175,t:20,b:44};
+  const rshort=k=>tshort(k,FIT?8:13);
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const X=w=>M.l+(w-wk[0])/(wk[wk.length-1]-wk[0]||1)*(W-M.l-M.r);
   const Y=v=>H-M.b-v*(H-M.t-M.b);
@@ -566,17 +567,19 @@ scatter("rangeQuad", DATA.rangeQuad, {
   if(picks.length){
     const svg=document.getElementById("pickups");
     const W=fitW(svg,660), FIT=W<620;
-    const RH=30, M={l:FIT?110:230,r:FIT?44:60,t:8,b:30}, H=M.t+M.b+picks.length*RH;
+    /* On phones the label sits above its bar so the bar gets the full width */
+    const RH=FIT?42:30, M={l:FIT?6:230,r:FIT?42:60,t:8,b:30}, H=M.t+M.b+picks.length*RH;
     svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
     const hi=Math.max(...picks.map(p=>p.started));
     const X=v=>M.l+v/hi*(W-M.l-M.r);
     picks.forEach((p,i)=>{
-      const y=M.t+i*RH;
-      const lbl=tclip(p.player,FIT?15:26);
-      S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:FIT?"font-size:10.5px":"font-size:12.5px",text:lbl},svg);
-      const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(p.started)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(p.key)}`},svg);
+      const y=M.t+i*RH, by=FIT?y+16:y+6, bh=FIT?14:RH-12;
+      const lbl=tclip(p.player,FIT?34:26);
+      if(FIT) S("text",{x:M.l,y:y+11,class:"pt-lbl",css:"font-size:11px",text:lbl},svg);
+      else S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:lbl},svg);
+      const bar=S("rect",{x:M.l,y:by,width:Math.max(X(p.started)-M.l,2),height:bh,rx:4,css:`fill:${cv(p.key)}`},svg);
       hover(bar,`<b>${p.player}</b> → ${nm(p.key)}<br>Added week ${p.week}${p.faab?` for $${p.faab}`:" (free)"}<br>${f1(p.started)} pts started (${p.starts} starts) · ${f1(p.rostered)} rostered`);
-      S("text",{x:X(p.started)+6,y:y+RH/2+4,class:"axis-t",css:"font-size:12px",text:f1(p.started)},svg);
+      S("text",{x:X(p.started)+6,y:by+bh/2+4,class:"axis-t",css:FIT?"font-size:10.5px":"font-size:12px",text:f1(p.started)},svg);
     });
     S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Points started since pickup"},svg);
   }
@@ -603,17 +606,18 @@ scatter("rangeQuad", DATA.rangeQuad, {
       .sort((x,y)=>y.ppd-x.ppd);
     const svg=document.getElementById("faabRoi");
     const W=fitW(svg,660), FIT=W<620;
-    const RH=30, M={l:FIT?92:230,r:FIT?86:150,t:8,b:30}, H=M.t+M.b+rows.length*RH;
+    const RH=FIT?42:30, M={l:FIT?6:230,r:FIT?76:150,t:8,b:30}, H=M.t+M.b+rows.length*RH;
     svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
     const hi=Math.max(...rows.map(r=>r.ppd), 0.1);
     const X=v=>M.l+v/hi*(W-M.l-M.r);
     rows.forEach((r,i)=>{
-      const y=M.t+i*RH;
-      S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:FIT?"font-size:10.5px":"font-size:12.5px",text:FIT?tshort(r.key,10):short(r.key)},svg);
-      const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(r.ppd)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(r.key)}`},svg);
+      const y=M.t+i*RH, by=FIT?y+16:y+6, bh=FIT?14:RH-12;
+      if(FIT) S("text",{x:M.l,y:y+11,class:"pt-lbl",css:"font-size:11px",text:short(r.key)},svg);
+      else S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(r.key)},svg);
+      const bar=S("rect",{x:M.l,y:by,width:Math.max(X(r.ppd)-M.l,2),height:bh,rx:4,css:`fill:${cv(r.key)}`},svg);
       const dpp = r.started>0 ? "$"+(r.spent/r.started).toFixed(2)+" per point" : "no started points yet";
       hover(bar,`<b>${nm(r.key)}</b><br>$${r.spent} spent on waivers → ${f1(r.started)} pts started<br>${dpp}`);
-      S("text",{x:X(r.ppd)+6,y:y+RH/2+4,class:"axis-t",css:FIT?"font-size:10.5px":"font-size:12px",
+      S("text",{x:X(r.ppd)+6,y:by+bh/2+4,class:"axis-t",css:FIT?"font-size:10.5px":"font-size:12px",
         text:FIT?`${r.ppd.toFixed(2)} pts/$`:`${r.ppd.toFixed(2)} pts/$ ($${r.spent})`},svg);
     });
     S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Started points per FAAB dollar"},svg);
@@ -661,7 +665,7 @@ scatter("rangeQuad", DATA.rangeQuad, {
   const L=DATA.leverage||[]; if(!L.length) return;
   const svg=document.getElementById("leverage");
   const W=fitW(svg,660), FIT=W<620;
-  const RH=34, M={l:FIT?92:190,r:FIT?48:70,t:24,b:34}, H=M.t+M.b+L.length*RH;
+  const RH=FIT?50:34, M={l:FIT?14:190,r:FIT?48:70,t:24,b:34}, H=M.t+M.b+L.length*RH;
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const X=v=>M.l+v*(W-M.l-M.r);
   for(const t of [0,.25,.5,.75,1]){
@@ -669,8 +673,9 @@ scatter("rangeQuad", DATA.rangeQuad, {
     S("text",{x:X(t),y:H-M.b+18,"text-anchor":"middle",class:"axis-t",text:Math.round(t*100)+"%"},svg);
   }
   L.forEach((r,i)=>{
-    const y=M.t+i*RH+RH/2;
-    S("text",{x:M.l-10,y:y+4,"text-anchor":"end",class:"pt-lbl",css:FIT?"font-size:10.5px":"",text:FIT?tshort(r.key,10):short(r.key)},svg);
+    const y=FIT? M.t+i*RH+33 : M.t+i*RH+RH/2;
+    if(FIT) S("text",{x:M.l,y:M.t+i*RH+13,class:"pt-lbl",css:"font-size:11px",text:short(r.key)},svg);
+    else S("text",{x:M.l-10,y:y+4,"text-anchor":"end",class:"pt-lbl",text:short(r.key)},svg);
     const ln=S("line",{x1:X(r.ifLoss),x2:X(r.ifWin),y1:y,y2:y,css:`stroke:${cv(r.key)}`,"stroke-width":5,"stroke-linecap":"round",opacity:.45},svg);
     S("circle",{cx:X(r.ifLoss),cy:y,r:5,fill:"var(--surface)",css:`stroke:${cv(r.key)}`,"stroke-width":2.5},svg);
     S("circle",{cx:X(r.ifWin),cy:y,r:5,css:`fill:${cv(r.key)}`},svg);
@@ -710,7 +715,7 @@ scatter("rangeQuad", DATA.rangeQuad, {
   const wk=PH.weeks, n=DATA.teams.length;
   const svg=document.getElementById("powerHist");
   const W=fitW(svg,660), FIT=W<620;
-  const H=420,M={l:FIT?28:40,r:FIT?80:150,t:16,b:40};
+  const H=420,M={l:FIT?26:40,r:FIT?70:150,t:16,b:40};
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const X=w=>M.l+(w-wk[0])/(wk[wk.length-1]-wk[0]||1)*(W-M.l-M.r);
   const Y=r=>M.t+(r-1)/(n-1)*(H-M.t-M.b);
@@ -737,16 +742,17 @@ scatter("rangeQuad", DATA.rangeQuad, {
   const rows=C.perTeam;
   const svg=document.getElementById("crimes");
   const W=fitW(svg,660), FIT=W<620;
-  const RH=30, M={l:FIT?92:190,r:FIT?46:60,t:8,b:30}, H=M.t+M.b+rows.length*RH;
+  const RH=FIT?42:30, M={l:FIT?6:190,r:FIT?42:60,t:8,b:30}, H=M.t+M.b+rows.length*RH;
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const hi=Math.max(...rows.map(r=>r.total));
   const X=v=>M.l+v/hi*(W-M.l-M.r);
   rows.forEach((r,i)=>{
-    const y=M.t+i*RH;
-    S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:FIT?"font-size:10.5px":"font-size:12.5px",text:FIT?tshort(r.key,10):short(r.key)},svg);
-    const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(r.total)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(r.key)}`},svg);
+    const y=M.t+i*RH, by=FIT?y+16:y+6, bh=FIT?14:RH-12;
+    if(FIT) S("text",{x:M.l,y:y+11,class:"pt-lbl",css:"font-size:11px",text:short(r.key)},svg);
+    else S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(r.key)},svg);
+    const bar=S("rect",{x:M.l,y:by,width:Math.max(X(r.total)-M.l,2),height:bh,rx:4,css:`fill:${cv(r.key)}`},svg);
     hover(bar,`<b>${nm(r.key)}</b>: ${f1(r.total)} pts lost to weekly worst calls<br>Worst: wk ${r.worst.week}, benched <b>${r.worst.benched}</b> (${f1(r.worst.benchedPts)}) behind ${r.worst.started} (${f1(r.worst.startedPts)}) at ${r.worst.slot} — cost ${f1(r.worst.gain)}`);
-    S("text",{x:X(r.total)+6,y:y+RH/2+4,class:"axis-t",css:"font-size:12px",text:f1(r.total)},svg);
+    S("text",{x:X(r.total)+6,y:by+bh/2+4,class:"axis-t",css:FIT?"font-size:10.5px":"font-size:12px",text:f1(r.total)},svg);
   });
   S("text",{x:(M.l+W-M.r)/2,y:H-6,"text-anchor":"middle",class:"axis-lbl",text:"Season points lost (worst call per week)"},svg);
   if(C.thisWeek.length){
@@ -763,16 +769,17 @@ scatter("rangeQuad", DATA.rangeQuad, {
   const rows=DC.teams;
   const svg=document.getElementById("draftTeams");
   const W=fitW(svg,660), FIT=W<620;
-  const RH=30, M={l:FIT?92:190,r:FIT?44:70,t:8,b:30}, H=M.t+M.b+rows.length*RH;
+  const RH=FIT?42:30, M={l:FIT?6:190,r:FIT?44:70,t:8,b:30}, H=M.t+M.b+rows.length*RH;
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);
   const hi=Math.max(...rows.map(r=>r.points));
   const X=v=>M.l+v/hi*(W-M.l-M.r);
   rows.forEach((r,i)=>{
-    const y=M.t+i*RH;
-    S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:FIT?"font-size:10.5px":"font-size:12.5px",text:FIT?tshort(r.key,10):short(r.key)},svg);
-    const bar=S("rect",{x:M.l,y:y+6,width:Math.max(X(r.points)-M.l,2),height:RH-12,rx:4,css:`fill:${cv(r.key)}`},svg);
+    const y=M.t+i*RH, by=FIT?y+16:y+6, bh=FIT?14:RH-12;
+    if(FIT) S("text",{x:M.l,y:y+11,class:"pt-lbl",css:"font-size:11px",text:short(r.key)},svg);
+    else S("text",{x:M.l-10,y:y+RH/2+4,"text-anchor":"end",class:"pt-lbl",css:"font-size:12.5px",text:short(r.key)},svg);
+    const bar=S("rect",{x:M.l,y:by,width:Math.max(X(r.points)-M.l,2),height:bh,rx:4,css:`fill:${cv(r.key)}`},svg);
     hover(bar,`<b>${nm(r.key)}</b>: drafted players have scored ${f1(r.points)} pts this season (wherever they play now)`);
-    S("text",{x:X(r.points)+6,y:y+RH/2+4,class:"axis-t",css:"font-size:12px",text:Math.round(r.points)},svg);
+    S("text",{x:X(r.points)+6,y:by+bh/2+4,class:"axis-t",css:FIT?"font-size:10.5px":"font-size:12px",text:Math.round(r.points)},svg);
   });
   const li=p=>`<li><b>${p.player}</b> (${p.position||"?"}, rd ${p.round} pk ${p.overall}) — ${f1(p.points)} pts · <span class="dot" style="background:${cv(p.key)};display:inline-block;width:8px;height:8px;border-radius:50%"></span> ${short(p.key)}</li>`;
   document.getElementById("draftLists").innerHTML =
