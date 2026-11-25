@@ -15,6 +15,7 @@ labels on every chart.
 from __future__ import annotations
 
 import json
+import re
 import sqlite3
 from datetime import date
 from pathlib import Path
@@ -45,6 +46,46 @@ def _round_map(d: dict, digits: int = 2) -> dict:
     return {k: (round(v, digits) if isinstance(v, float) else v) for k, v in d.items()}
 
 
+# Words that make a poor one-word nickname ("The Freak Factory" -> "Freak").
+_NICK_SKIP = {"the", "a", "an", "team", "new", "camp", "mr", "mrs", "los", "las", "el", "la", "le", "de"}
+
+
+def nicknames(names: dict[str, str], overrides: dict[str, str] | None = None) -> dict[str, str]:
+    """Short display names: the first meaningful word of each team name.
+
+    'BUCKY SHAROOS MID FACTORY' -> 'Bucky', "Hiawatha's Return" -> 'Hiawatha',
+    'The Backdoor Bandits' -> 'Backdoor'. Symbols and emoji are dropped, an
+    all-caps word is title-cased, and a trailing possessive is stripped. If
+    two teams would collide, both get their first two meaningful words.
+    `overrides` (team name or key -> nickname) wins outright.
+    """
+    overrides = overrides or {}
+
+    def words(name: str) -> list[str]:
+        out = []
+        for raw in name.split():
+            w = re.sub(r"[\u2019']s$", "", raw)                 # possessive
+            w = re.sub(r"[^\w'\u2019-]", "", w).strip("'\u2019-_")
+            if not w or w.lower() in _NICK_SKIP:
+                continue
+            out.append(w.capitalize() if w.isupper() and len(w) > 1 else w)
+        return out
+
+    picked = {}
+    for key, name in names.items():
+        ws = words(name)
+        picked[key] = (ws[:1], ws[:2]) if ws else ([name], [name])
+    first = {k: " ".join(v[0]) for k, v in picked.items()}
+    counts: dict[str, int] = {}
+    for n in first.values():
+        counts[n] = counts.get(n, 0) + 1
+    result = {}
+    for key, name in names.items():
+        nick = first[key] if counts[first[key]] == 1 else " ".join(picked[key][1])
+        result[key] = overrides.get(key) or overrides.get(name) or nick
+    return result
+
+
 def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
     teams = load.load_teams(conn).sort_values("team_id").reset_index(drop=True)
     matchups = load.load_matchups(conn)
@@ -59,10 +100,12 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
     latest = int(weeks[-1])
     names = dict(zip(teams["team_key"], teams["name"]))
 
+    nicks = nicknames(names, settings.raw.get("league", {}).get("nicknames"))
     team_meta = [
         {
             "key": row.team_key,
             "name": row.name,
+            "short": nicks[row.team_key],
             "manager": row.manager,
             "color": PALETTE_LIGHT[i % len(PALETTE_LIGHT)],
             "colorDark": PALETTE_DARK[i % len(PALETTE_DARK)],
@@ -313,11 +356,11 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
                               "swing": round(swing, 1), "flips": flips})
             txn_data["trades"].append({"week": wk0, "sides": sides})
 
-        # Most consequential trades first: a flipped win outweighs any points
-        # swing; among equals, the bigger counterfactual swing leads.
-        txn_data["trades"].sort(
-            key=lambda t: max(len(s["flips"]) * 100 + abs(s["swing"]) for s in t["sides"]),
-            reverse=True)
+        # Biggest effect first: total roster points the trade moved, summed
+        # across both teams' counterfactual swings.
+        for t in txn_data["trades"]:
+            t["impact"] = round(sum(abs(s["swing"]) for s in t["sides"]), 1)
+        txn_data["trades"].sort(key=lambda t: t["impact"], reverse=True)
 
     # --- schedule swap, belt, bench crimes -----------------------------------
     swap = fun.schedule_swap(matchups)
