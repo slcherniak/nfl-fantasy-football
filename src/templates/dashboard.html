@@ -96,6 +96,12 @@ td .dot{display:inline-block;margin-right:7px;vertical-align:1px}
 .belt-lineage .chip{border:1px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap}
 ul.plain{list-style:none;margin:6px 0 0;padding:0;font-size:13px;color:var(--ink-2);display:grid;gap:5px}
 ul.plain b{color:var(--ink)}
+[hidden]{display:none!important}
+/* tabs */
+.tabs{position:sticky;top:0;z-index:6;display:flex;gap:8px;background:var(--bg);padding:10px 0;margin:0 0 8px;border-bottom:1px solid var(--grid)}
+.tabs button{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:14px;padding:7px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
 /* what-if machine */
 .wif-week{margin:12px 0 5px;font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .wif-row{display:flex;flex-wrap:wrap;gap:8px}
@@ -147,6 +153,10 @@ html{-webkit-text-size-adjust:100%}
   <span class="eyebrow">Man Camp &middot; 2026 Season</span>
   <h1>The Film Room</h1>
 </header>
+<nav id="tabs" class="tabs" hidden>
+  <button data-tab="film" class="on">The Film Room</button>
+  <button data-tab="whatif">What-If Machine</button>
+</nav>
 <p class="subline" id="subline"></p>
 
 <div class="cardgrid" id="tiles"></div>
@@ -1025,6 +1035,31 @@ scatter("rangeQuad", DATA.rangeQuad, {
     }
   }
   render();
+})();
+
+/* ---- tabs: Film Room vs What-If Machine ----
+   Runs last so it can snapshot which sections hid themselves for lack of
+   data and restore exactly that state when switching back. */
+(function(){
+  const nav=document.getElementById("tabs"), wif=document.getElementById("wifSec");
+  if(!nav) return;
+  if(!(DATA.whatIf&&DATA.whatIf.games.length)) return;   // nothing to tab
+  nav.hidden=false;
+  const wrap=document.querySelector(".wrap");
+  const baseHidden=new Map();
+  for(const el of wrap.children) baseHidden.set(el, el.hidden);
+  function setTab(t){
+    for(const el of wrap.children){
+      if(el.tagName==="HEADER"||el===nav) continue;
+      if(el===wif) el.hidden = t==="whatif" ? baseHidden.get(el) : true;
+      else el.hidden = t==="whatif" ? true : baseHidden.get(el);
+    }
+    nav.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
+    try{ history.replaceState(null,"", t==="whatif"?"#whatif":location.pathname+location.search); }catch(e){}
+    window.scrollTo(0,0);
+  }
+  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+  setTab(location.hash==="#whatif"?"whatif":"film");
 })();
 </script>
 </body>
