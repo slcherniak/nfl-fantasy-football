@@ -313,6 +313,12 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
                               "swing": round(swing, 1), "flips": flips})
             txn_data["trades"].append({"week": wk0, "sides": sides})
 
+        # Most consequential trades first: a flipped win outweighs any points
+        # swing; among equals, the bigger counterfactual swing leads.
+        txn_data["trades"].sort(
+            key=lambda t: max(len(s["flips"]) * 100 + abs(s["swing"]) for s in t["sides"]),
+            reverse=True)
+
     # --- schedule swap, belt, bench crimes -----------------------------------
     swap = fun.schedule_swap(matchups)
     wins_actual = {k: swap[k][k]["w"] + 0.5 * swap[k][k]["t"] for k in swap}
@@ -440,6 +446,30 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
         bubble.sort(key=lambda r: -r["odds"])
         war_room = {"deadline": "Nov 28", "bubble": bubble}
 
+    # --- what-if playoff machine ----------------------------------------------
+    # Exact enumeration data for the browser: remaining games, current wins
+    # (ties = 0.5), frozen PF, and each team's full-season opponent list for
+    # the opponents'-wins tiebreaker.
+    wi_games, seen_pairs = [], set()
+    for r in remaining.itertuples():
+        pid = (int(r.week), tuple(sorted((str(r.team_key), str(r.opp_key)))))
+        if pid in seen_pairs:
+            continue
+        seen_pairs.add(pid)
+        wi_games.append({"week": pid[0], "a": pid[1][0], "b": pid[1][1]})
+    wi_games.sort(key=lambda g: g["week"])
+    season_opps = {str(k): [] for k in teams["team_key"]}
+    for r in all_rows.itertuples():
+        k = str(r.team_key)
+        if k in season_opps and r.opp_key:
+            season_opps[k].append(str(r.opp_key))
+    what_if = {
+        "games": wi_games,
+        "wins": {k: float(luck_df.loc[k, "actual_wins"]) for k in teams["team_key"]},
+        "pf": {k: round(float(luck_df.loc[k, "points_for"]), 1) for k in teams["team_key"]},
+        "opps": season_opps,
+    } if wi_games else None
+
     # --- latest-week awards ----------------------------------------------------
     week_m = matchups[matchups["week"] == latest]
     week_eff = eff_weekly[eff_weekly["week"] == latest] if not eff_weekly.empty else None
@@ -471,6 +501,7 @@ def build_data(conn: sqlite3.Connection, settings: Settings) -> dict:
         "leverage": leverage,
         "seedMatrix": seed_matrix,
         "powerHistory": {"weeks": power_weeks, "ranks": power_ranks},
+        "whatIf": what_if,
         "draftCard": draft_card,
         "warRoom": war_room,
         "txns": txn_data,
