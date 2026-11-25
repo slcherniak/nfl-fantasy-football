@@ -120,6 +120,9 @@ button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .wif-paths{display:grid;gap:10px}
 .wif-path{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:13.5px;color:var(--ink-2);line-height:1.5}
 .wif-path b{color:var(--ink)}
+.wif-path-h{margin-bottom:4px}
+.wif-steps{margin:0;padding-left:20px}
+.wif-steps li{margin:2px 0}
 .badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;padding:2px 6px}
 .badge.in{background:var(--good);color:var(--surface)} .badge.out{background:var(--bad);color:var(--surface)}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;line-height:1.35;padding:7px 10px;border-radius:5px;max-width:260px;z-index:10;opacity:0;transition:opacity .08s}
@@ -235,7 +238,7 @@ html{-webkit-text-size-adjust:100%}
   <p class="sec-sub">Playoff math you can argue with. Pick winners for the remaining games — the field updates instantly, and unpicked games count both ways, every combination checked exactly (no simulation). Seeding uses the league's real tiebreaker: record, then total points for (PF is frozen at today's totals, since future scores are unknowable).</p>
   <div id="wifGames" class="wif-games"></div>
   <div class="tablewrap"><table id="wifTable"></table></div>
-  <h3 class="sub-h" id="wifPathsHead" style="margin-top:18px">Paths for the bubble</h3>
+  <h3 class="sub-h" id="wifPathsHead" style="margin-top:18px">What each team needs</h3>
   <div id="wifPaths" class="wif-paths"></div>
 </section>
 
@@ -901,49 +904,80 @@ scatter("rangeQuad", DATA.rangeQuad, {
     const F=free.length;
     if(F>20) return null;                       // 2^20 is the sanity cap
     const total=1<<F;
-    // "wins out" bitmasks per team over the open games
+    // per-team bitmasks of the open games they play: bit set = team "a" wins
     const needSet=new Int32Array(N), needClear=new Int32Array(N), ownFree=new Int32Array(N);
     free.forEach((gi,b)=>{ const g=G[gi];
       needSet[g.a]|=1<<b; ownFree[g.a]++;
       needClear[g.b]|=1<<b; ownFree[g.b]++; });
     const inC=new Float64Array(N), byeC=new Float64Array(N), woIn=new Float64Array(N);
-    const afford=new Int8Array(N).fill(-1);            // most own losses survived
-    const rival=new Float64Array(N*N);                 // [firstOut][lastIn] at the cut
-    const cutTieW=new Float64Array(N), cutN=new Float64Array(N);
-    // per-team win-out conditionals per open game & side: what to root for
-    const woG=new Float64Array(N*F*2), woGin=new Float64Array(N*F*2);
+    // Record-only outcome per scenario: locked in / locked out no matter how
+    // the remaining points shake out. Clinched/Eliminated use these, never
+    // the frozen-PF estimate.
+    const lockIn=new Float64Array(N), lockOut=new Float64Array(N);
+    const WS=new Uint8Array(total*N);           // doubled wins (a tie adds 1)
     const w=new Float64Array(N), order=new Int32Array(N);
-    const inSet=new Uint8Array(N);
     for(let m=0;m<total;m++){
       w.set(w0);
       for(let b=0;b<F;b++){ const g=G[free[b]]; if((m>>b)&1) w[g.a]++; else w[g.b]++; }
-      for(let i=0;i<N;i++) order[i]=i;
+      const off=m*N;
+      for(let i=0;i<N;i++){ WS[off+i]=Math.round(w[i]*2); order[i]=i; }
       for(let i=1;i<N;i++){ const v=order[i]; let j=i-1;      // sort: wins, then PF
         while(j>=0){ const u=order[j];
           if((w[u]-w[v] || PF[u]-PF[v])<0){ order[j+1]=u; j--; } else break; }
         order[j+1]=v; }
-      inSet.fill(0);
-      for(let s=0;s<NP;s++){ const t=order[s]; inSet[t]=1; inC[t]++; if(s<NB) byeC[t]++;
-        const lost=popcount((m&needClear[t])|(~m&needSet[t]));
-        if(lost>afford[t]) afford[t]=lost; }
-      const lastIn=order[NP-1], firstOut=order[NP];
-      rival[firstOut*N+lastIn]++; cutN[firstOut]++;
-      if(w[firstOut]===w[lastIn]) cutTieW[firstOut]++;
-      for(let t=0;t<N;t++){
-        if((m&needSet[t])===needSet[t] && (m&needClear[t])===0){
-          if(inSet[t]) woIn[t]++;
-          const base=t*F*2;
-          for(let b=0;b<F;b++){ const k=base+b*2+((m>>b)&1); woG[k]++; if(inSet[t]) woGin[k]++; }
-        }
-      }
+      for(let s=0;s<NP;s++){ const t=order[s]; inC[t]++; if(s<NB) byeC[t]++;
+        if((m&needSet[t])===needSet[t] && (m&needClear[t])===0) woIn[t]++; }
+      for(let t=0;t<N;t++){ const wt=WS[off+t]; let above=0, atLeast=0;
+        for(let j=0;j<N;j++){ if(j===t) continue; const wj=WS[off+j];
+          if(wj>wt){above++;atLeast++;} else if(wj===wt) atLeast++; }
+        if(atLeast<NP) lockIn[t]++; else if(above>=NP) lockOut[t]++; }
     }
-    return {total, F, free, ownFree,
+    return {total, F, free, ownFree, needSet, needClear, WS,
             inP:i=>inC[i]/total, byeP:i=>byeC[i]/total,
             woP:i=>woIn[i]/(total>>ownFree[i]),
-            afford:i=>afford[i],
-            rivalOf:i=>{ let best=-1,bc=0; for(let j=0;j<N;j++){ const c=rival[i*N+j]; if(c>bc){bc=c;best=j;} }
-                         return best<0?null:{j:best, share:bc/(cutN[i]||1), tieW:cutTieW[i]/(cutN[i]||1)}; },
-            woCond:(i,b,side)=>{ const k=i*F*2+b*2+side; return woG[k]?woGin[k]/woG[k]:null; }};
+            clinched:i=>lockIn[i]===total, dead:i=>lockOut[i]===total};
+  }
+
+  /* What one team needs, as instructions: the fewest own wins that clinch
+     outright; failing that, win out plus the smallest set of other results
+     (greedy, up to 3) that keeps them alive — locked in, or level on record
+     and into a points-for tiebreak, whose rival and gap are reported. */
+  function analyze(i,res){
+    const {total,F,free,WS,needSet,needClear,ownFree}=res;
+    const mine=needSet[i]|needClear[i], own=ownFree[i];
+    const st=new Uint8Array(total), ownW=new Uint8Array(total);  // st: 2 in · 1 tiebreak · 0 out
+    for(let m=0;m<total;m++){
+      const off=m*N, wi=WS[off+i]; let above=0, atLeast=0;
+      for(let j=0;j<N;j++){ if(j===i) continue; const wj=WS[off+j];
+        if(wj>wi){above++;atLeast++;} else if(wj===wi) atLeast++; }
+      st[m]= atLeast<NP?2 : above>=NP?0 : 1;
+      ownW[m]=popcount(m&needSet[i])+popcount(~m&needClear[i]);
+    }
+    for(let k=1;k<=own;k++){
+      let ok=true; for(let m=0;m<total&&ok;m++) if(ownW[m]>=k&&st[m]!==2) ok=false;
+      if(ok) return {own, clinchWith:k};
+    }
+    const myGames=[]; for(let b=0;b<F;b++) if((mine>>b)&1) myGames.push(b);
+    let pool=[]; for(let m=0;m<total;m++) if(ownW[m]===own) pool.push(m);
+    const rate=p=>{ let c=0; for(const m of p) if(st[m]) c++; return p.length?c/p.length:0; };
+    let cur=rate(pool); const conds=[];
+    while(cur<1&&conds.length<3){
+      let best=null;
+      for(let b=0;b<F;b++){
+        if((mine>>b)&1||conds.some(c=>c.b===b)) continue;
+        for(const side of [0,1]){ let n=0,c=0;
+          for(const m of pool) if(((m>>b)&1)===side){ n++; if(st[m]) c++; }
+          if(n&&(!best||c/n>best.r+1e-9)) best={b,side,r:c/n}; }
+      }
+      if(!best||best.r<=cur+1e-9) break;
+      conds.push(best); pool=pool.filter(m=>((m>>best.b)&1)===best.side); cur=best.r;
+    }
+    let tieN=0; const partner=new Float64Array(N);
+    for(const m of pool) if(st[m]===1){ tieN++; const off=m*N, wi=WS[off+i];
+      for(let j=0;j<N;j++) if(j!==i&&WS[off+j]===wi) partner[j]++; }
+    const partners=[...partner].map((c,j)=>({j,share:tieN?c/tieN:0}))
+      .filter(p=>p.share>=0.3).sort((a,b)=>b.share-a.share).slice(0,2);
+    return {own, myGames, conds, alive:cur, tieShare:pool.length?tieN/pool.length:0, partners};
   }
 
   function render(){
@@ -979,66 +1013,61 @@ scatter("rangeQuad", DATA.rangeQuad, {
       return `${p[0]}-${p[1]}${t} <span style="color:var(--muted)">→</span> <b>${p[0]+pw[i]}-${p[1]+pl[i]}${t}</b>`; };
     // wins as of the current picks, for sorting
     const wNow=Float64Array.from(baseW); for(let i=0;i<N;i++) wNow[i]+=pw[i];
+    const plans={};
+    keys.forEach((k,i)=>{ if(!res.clinched(i)&&!res.dead(i)) plans[i]=analyze(i,res); });
     const rows=keys.map((k,i)=>({k,i,in:res.inP(i),bye:res.byeP(i),wo:res.woP(i)}))
       .sort((x,y)=> y.in-x.in || wNow[y.i]-wNow[x.i] || PF[y.i]-PF[x.i]);
-    tbl.innerHTML=`<thead><tr><th class="l">Team</th><th>Record</th><th>Playoffs</th><th>Bye</th><th>Win out</th><th class="l">The read</th></tr></thead>`;
+    const headline=p=> p.clinchWith!=null
+        ? (p.clinchWith===p.own? "Win out → in" : `Win ${p.clinchWith} more → in`)
+      : p.alive<0.5 ? "Long shot"
+      : p.conds.length ? "Win out + help"
+      : "Win out + points tiebreak";
+    tbl.innerHTML=`<thead><tr><th class="l">Team</th><th>Record</th><th>Playoffs</th><th>Bye</th><th>Win out</th><th class="l">What it takes</th></tr></thead>`;
     const tb=document.createElement("tbody");
     for(const r of rows){
-      const read = r.in>=1
+      const read = res.clinched(r.i)
           ? `<span class="badge in">Clinched</span>${r.bye>=1?" · bye locked":r.bye>0?` · ${fmt(r.bye)} for a bye`:""}`
-        : r.in<=0 ? `<span class="badge out">Eliminated</span>`
-        : r.wo>=1 ? `Controls its fate — win out and it's in`
-        : r.wo<=0 ? `Out even winning out under these picks`
-        : `Win out → in ${fmt(r.wo)} of the rest — needs help`;
+        : res.dead(r.i) ? `<span class="badge out">Eliminated</span>`
+        : headline(plans[r.i]);
       const tr=document.createElement("tr");
       tr.innerHTML=`<td class="l"><span class="dot" style="background:${cv(r.k)}"></span>${nmCell(r.k)}</td>
         <td>${recCell(r.i)}</td>
-        <td class="${r.in>=1?"pos":r.in<=0?"neg":""}">${fmt(r.in)}</td>
+        <td class="${res.clinched(r.i)?"pos":res.dead(r.i)?"neg":""}">${fmt(r.in)}</td>
         <td>${fmt(r.bye)}</td><td>${fmt(r.wo)}</td>
         <td class="l wif-note">${read}</td>`;
       tb.appendChild(tr);
     }
     tbl.appendChild(tb);
 
-    /* -- plain-English paths for every team still genuinely on the bubble -- */
+    /* -- what each live team needs, as a short checklist -- */
     pathsBox.innerHTML="";
-    const bubble=rows.filter(r=>r.in>0&&r.in<1);
-    pathsHead.hidden=!bubble.length;
-    for(const r of bubble){
-      const i=r.i, bits=[];
-      const own=res.ownFree[i], a=res.afford(i);
-      if(own===0) bits.push(`done playing — fate rests entirely on other games`);
-      else if(a<=0) bits.push(`<b>must win out</b>${r.wo<1?` — and even that is only ${fmt(r.wo)}`:" — win out and they're in, no help needed"}`);
-      else bits.push(`can survive ${a} loss${a>1?"es":""} and still make it in some scenario`);
-      // rooting guide inside the win-out world
-      const needs=[], roots=[];
-      for(let b=0;b<res.F;b++){ const g=G[res.free[b]];
-        if(g.a===i||g.b===i) continue;
-        const pA=res.woCond(i,b,1), pB=res.woCond(i,b,0);
-        if(pA==null||pB==null) continue;
-        const wk=WI.games[res.free[b]].week, A=tshort(keys[g.a],14), B=tshort(keys[g.b],14);
-        if(pB<=0&&pA>0) needs.push(`<b>${A}</b> to beat ${B} (wk ${wk})`);
-        else if(pA<=0&&pB>0) needs.push(`<b>${B}</b> to beat ${A} (wk ${wk})`);
-        else if(Math.abs(pA-pB)>=0.25) roots.push({d:Math.abs(pA-pB), txt:`${pA>pB?A:B} over ${pA>pB?B:A} (wk ${wk})`});
-      }
-      if(needs.length) bits.push(`winning out, they also need ${needs.join(" and ")}`);
-      roots.sort((x,y)=>y.d-x.d);
-      if(roots.length) bits.push(`best things to root for: ${roots.slice(0,2).map(x=>x.txt).join(", ")}`);
-      // who the cut comes down to, and how the tie breaks
-      const rv=res.rivalOf(i);
-      if(rv&&rv.j!==i&&r.in<0.995){
-        const j=rv.j, R=tshort(keys[j],16);
-        let tb2=`the last spot most often comes down to <b>${R}</b>`;
-        if(rv.tieW>0.15){
-          const gap=Math.abs(PF[i]-PF[j]).toFixed(1);
-          tb2+= PF[i]>PF[j]
-            ? ` — a record tie breaks on total points, where they hold a ${gap}-point cushion (${PF[i]} vs ${PF[j]})`
-            : ` — a record tie breaks on total points, where they'd need to outscore ${R} by ${gap} the rest of the way (${PF[i]} vs ${PF[j]})`;
+    const weeksLeft=new Set(WI.games.map(g=>g.week)).size;
+    const live=rows.filter(r=>plans[r.i]);
+    pathsHead.hidden=!live.length;
+    for(const r of live){
+      const i=r.i, p=plans[i], me=short(keys[i]), steps=[];
+      const opp=b=>{ const g=G[res.free[b]]; return {o:g.a===i?g.b:g.a, wk:WI.games[res.free[b]].week}; };
+      if(p.clinchWith!=null){
+        steps.push(p.clinchWith===p.own
+          ? `Win out and ${me} is in — no help needed`
+          : `Win ${p.clinchWith} of the last ${p.own} and ${me} is in — no help needed`);
+      } else {
+        if(p.own) steps.push(`<b>Win out</b>: ${p.myGames.map(b=>{const x=opp(b);return `${short(keys[x.o])} (wk ${x.wk})`;}).join(", ")}`);
+        for(const c of p.conds){
+          const g=G[res.free[c.b]], win=c.side?g.a:g.b, lose=c.side?g.b:g.a;
+          steps.push(`Root for <b>${short(keys[lose])}</b> to lose wk ${WI.games[res.free[c.b]].week} (to ${short(keys[win])})`);
         }
-        bits.push(tb2);
+        if(p.tieShare>0.05) for(const q of p.partners){
+          const R=short(keys[q.j]), gap=PF[i]-PF[q.j], abs=Math.abs(gap).toFixed(1);
+          steps.push(gap>=0
+            ? `If level with <b>${R}</b> on record, points decide: ${me} is up ${abs} — protect it`
+            : `If level with <b>${R}</b> on record, points decide: ${me} is down ${abs} — outscore ${R} by ${(Math.abs(gap)+0.1).toFixed(1)}+ over the last ${weeksLeft} weeks`);
+        }
+        if(p.alive<0.995) steps.push(`Still not a lock — even all that leaves ${me} alive in ${fmt(p.alive)} of outcomes`);
       }
       const d=document.createElement("div"); d.className="wif-path";
-      d.innerHTML=`<span class="dot" style="background:${cv(r.k)}"></span><b>${nm(r.k)}</b> (in ${fmt(r.in)} of scenarios): ${bits.join("; ")}.`;
+      d.innerHTML=`<div class="wif-path-h"><span class="dot" style="background:${cv(r.k)}"></span><b>${nm(r.k)}</b> <span style="color:var(--muted)">· ${recOf[r.k]||""}</span></div>
+        <ol class="wif-steps">${steps.map(s=>`<li>${s}</li>`).join("")}</ol>`;
       pathsBox.appendChild(d);
     }
   }
