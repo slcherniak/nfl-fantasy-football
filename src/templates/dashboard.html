@@ -103,6 +103,8 @@ ul.plain b{color:var(--ink)}
 .tabs button{flex:none;font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:14px;padding:7px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
 .tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
 button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nm-nick{display:none}
+@media(max-width:640px){.nm-full{display:none}.nm-nick{display:inline}}
 .heat-legend{display:flex;align-items:center;gap:3px;margin:10px 4px 8px;font-size:12px;color:var(--muted);flex-wrap:wrap}
 .heat-legend i{width:20px;height:10px;border-radius:2px;display:inline-block}
 .heat-legend span{margin-inline:5px}
@@ -271,7 +273,7 @@ html{-webkit-text-size-adjust:100%}
       <div class="chart-card"><div class="scrollwrap"><svg id="faabRoi"></svg></div></div>
     </div>
   </div>
-  <h3 class="sub-h" style="margin-top:18px">Trade scoreboard <span style="font-family:var(--body);font-weight:400;font-size:13px;color:var(--muted);text-transform:none;letter-spacing:0">· most consequential first — flipped wins, then counterfactual points swung</span></h3>
+  <h3 class="sub-h" style="margin-top:18px">Trade scoreboard <span style="font-family:var(--body);font-weight:400;font-size:13px;color:var(--muted);text-transform:none;letter-spacing:0">· biggest effect first — total roster points swung across both teams vs no trade</span></h3>
   <p class="sec-sub">Each card shows started points from the players received, plus the <b>what-if verdict</b>: a replay of every week since the deal with the trade undone (optimal lineups in both worlds). Positive means the trade made that roster better than the no-trade world.</p>
   <div id="trades" class="trades"></div>
 </section>
@@ -314,7 +316,8 @@ html{-webkit-text-size-adjust:100%}
 const DATA = /*__DATA__*/null;
 const teams = {}; DATA.teams.forEach((t,i)=>{ t.var = `var(--t${i+1})`; t.idx=i; teams[t.key]=t; });
 const nm = k => teams[k].name, cv = k => teams[k].var;
-const short = k => { const n = nm(k); return n.length>16 ? n.slice(0,15).trimEnd()+"…" : n; };
+const nmCell = k => `<span class="nm-full">${nm(k)}</span><span class="nm-nick">${short(k)}</span>`;
+const short = k => teams[k].short || nm(k);
 /* Fit-to-phone: when the card is narrower than a chart's design width,
    shrink the viewBox to the card so text renders 1:1 instead of the chart
    scrolling sideways. */
@@ -322,7 +325,7 @@ function fitW(svg, def){ const el=svg.closest(".scrollwrap")||svg.parentNode;
   const w=el?el.clientWidth:0;
   if(w&&w<def){ svg.classList.add("fit"); return Math.max(320,w); }
   return def; }
-const tshort=(k,n)=>{const s=nm(k);return s.length>n?s.slice(0,n-1).trimEnd()+"…":s;};
+const tshort=(k,n)=>{const s=short(k);return s.length>n?s.slice(0,n-1).trimEnd()+"…":s;};
 const tclip=(s,n)=>{s=String(s);return s.length>n?s.slice(0,n-1).trimEnd()+"…":s;};
 const f1 = x => (Math.round(x*10)/10).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1});
 const pct = x => Math.round(x*100)+"%";
@@ -372,7 +375,7 @@ document.getElementById("foot").textContent =
     const luckCls = r.luck>0.05?"pos":r.luck<-0.05?"neg":"";
     const mv = r.move>0?` <span class="pos">▲${r.move}</span>`:r.move<0?` <span class="neg">▼${-r.move}</span>`:"";
     tr.innerHTML=`<td>${r.rank}</td>
-      <td class="l"><span class="dot" style="background:${cv(r.key)}"></span>${nm(r.key)}</td>
+      <td class="l"><span class="dot" style="background:${cv(r.key)}"></span>${nmCell(r.key)}</td>
       <td>${r.record}</td>
       <td>${r.allPlay} <span style="color:var(--muted)">${r.apPct.toFixed(3).replace(/^0/,"")}</span></td>
       <td>${f1(r.ppg)}</td><td>${f1(r.pf)}</td><td>${f1(r.pa)}</td>
@@ -675,12 +678,13 @@ scatter("rangeQuad", DATA.rangeQuad, {
         <div class="tm"><span class="dot" style="background:${cv(s.key)};display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px"></span>${nm(s.key)} received</div>
         <div class="pl">${s.players.map(p=>`${p.name} (${f1(p.started)})`).join(", ")}</div></div>
         <div class="tot${lead===s?" pos":""}">${f1(s.total)}</div></div>`;
-    d.innerHTML=`<div class="hdr">Week ${t.week} trade${lead?"":" · dead even"}</div>${side(a)}${side(b)}${verdict(a,b)}`;
+    const imp=t.impact!=null?` · <span style="color:var(--ink)">${f1(t.impact)} pts swung</span>`:"";
+    d.innerHTML=`<div class="hdr">Week ${t.week} trade${imp}${lead?"":" · dead even"}</div>${side(a)}${side(b)}${verdict(a,b)}`;
     box.appendChild(d);
   }
   function verdict(a,b){
     if(a.swing==null) return "";
-    const sw=s=>`${nm(s.key)} <b>${s.swing>0?"+":""}${f1(s.swing)}</b>`;
+    const sw=s=>`${short(s.key)} <b>${s.swing>0?"+":""}${f1(s.swing)}</b>`;
     const flips=[...(a.flips||[]).map(f=>({s:a,...f})),...(b.flips||[]).map(f=>({s:b,...f}))];
     const flipTxt = flips.length
       ? flips.map(f=>`turned ${short(f.s.key)}'s week-${f.week} ${f.from} into a ${f.to}`).join("; ")
@@ -987,7 +991,7 @@ scatter("rangeQuad", DATA.rangeQuad, {
         : r.wo<=0 ? `Out even winning out under these picks`
         : `Win out → in ${fmt(r.wo)} of the rest — needs help`;
       const tr=document.createElement("tr");
-      tr.innerHTML=`<td class="l"><span class="dot" style="background:${cv(r.k)}"></span>${nm(r.k)}</td>
+      tr.innerHTML=`<td class="l"><span class="dot" style="background:${cv(r.k)}"></span>${nmCell(r.k)}</td>
         <td>${recCell(r.i)}</td>
         <td class="${r.in>=1?"pos":r.in<=0?"neg":""}">${fmt(r.in)}</td>
         <td>${fmt(r.bye)}</td><td>${fmt(r.wo)}</td>
