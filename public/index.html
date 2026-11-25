@@ -96,6 +96,12 @@ td .dot{display:inline-block;margin-right:7px;vertical-align:1px}
 .belt-lineage .chip{border:1px solid var(--line);border-radius:999px;padding:2px 9px;white-space:nowrap}
 ul.plain{list-style:none;margin:6px 0 0;padding:0;font-size:13px;color:var(--ink-2);display:grid;gap:5px}
 ul.plain b{color:var(--ink)}
+[hidden]{display:none!important}
+/* tabs */
+.tabs{position:sticky;top:0;z-index:6;display:flex;gap:8px;background:var(--bg);padding:10px 0;margin:0 0 8px;border-bottom:1px solid var(--grid)}
+.tabs button{font-family:var(--display);font-weight:600;text-transform:uppercase;letter-spacing:.06em;font-size:14px;padding:7px 16px;border-radius:999px;border:1px solid var(--line);background:var(--surface);color:var(--ink-2);cursor:pointer}
+.tabs button.on{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+
 /* what-if machine */
 .wif-week{margin:12px 0 5px;font-family:var(--display);font-weight:600;font-size:13px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
 .wif-row{display:flex;flex-wrap:wrap;gap:8px}
@@ -104,6 +110,9 @@ ul.plain b{color:var(--ink)}
 .wif-g button.on{background:var(--ink);color:var(--bg);font-weight:700}
 .wif-g .vs{font-size:10px;color:var(--muted);padding:0 1px}
 .wif-note{font-size:13px;color:var(--ink-2)}
+.wif-paths{display:grid;gap:10px}
+.wif-path{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;font-size:13.5px;color:var(--ink-2);line-height:1.5}
+.wif-path b{color:var(--ink)}
 .badge{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;border-radius:4px;padding:2px 6px}
 .badge.in{background:var(--good);color:var(--surface)} .badge.out{background:var(--bad);color:var(--surface)}
 #tip{position:fixed;pointer-events:none;background:var(--ink);color:var(--bg);font-size:13px;line-height:1.35;padding:7px 10px;border-radius:5px;max-width:260px;z-index:10;opacity:0;transition:opacity .08s}
@@ -144,6 +153,10 @@ html{-webkit-text-size-adjust:100%}
   <span class="eyebrow">Man Camp &middot; 2026 Season</span>
   <h1>The Film Room</h1>
 </header>
+<nav id="tabs" class="tabs" hidden>
+  <button data-tab="film" class="on">The Film Room</button>
+  <button data-tab="whatif">What-If Machine</button>
+</nav>
 <p class="subline" id="subline"></p>
 
 <div class="cardgrid" id="tiles"></div>
@@ -211,6 +224,8 @@ html{-webkit-text-size-adjust:100%}
   <p class="sec-sub">Playoff math you can argue with. Pick winners for the remaining games — the field updates instantly, and unpicked games count both ways, every combination checked exactly (no simulation). Seeding uses the league's real tiebreakers: record, then opponents' wins, then points for (PF is frozen at today's totals, since future scores are unknowable).</p>
   <div id="wifGames" class="wif-games"></div>
   <div class="tablewrap"><table id="wifTable"></table></div>
+  <h3 class="sub-h" id="wifPathsHead" style="margin-top:18px">Paths for the bubble</h3>
+  <div id="wifPaths" class="wif-paths"></div>
 </section>
 
 <section>
@@ -865,6 +880,8 @@ scatter("rangeQuad", DATA.rangeQuad, {
   const recOf={}; for(const r of DATA.standings) recOf[r.key]=r.record;
   const state=new Array(G.length).fill(0);  // 0 open · 1 a wins · 2 b wins
 
+  const popcount=x=>{x=x-((x>>1)&0x55555555);x=(x&0x33333333)+((x>>2)&0x33333333);return(((x+(x>>4))&0x0f0f0f0f)*0x01010101)>>24;};
+
   function compute(){
     const w0=Float64Array.from(baseW), free=[];
     state.forEach((s,gi)=>{ if(s===1) w0[G[gi].a]++; else if(s===2) w0[G[gi].b]++; else free.push(gi); });
@@ -877,7 +894,13 @@ scatter("rangeQuad", DATA.rangeQuad, {
       needSet[g.a]|=1<<b; ownFree[g.a]++;
       needClear[g.b]|=1<<b; ownFree[g.b]++; });
     const inC=new Float64Array(N), byeC=new Float64Array(N), woIn=new Float64Array(N);
+    const afford=new Int8Array(N).fill(-1);            // most own losses survived
+    const rival=new Float64Array(N*N);                 // [firstOut][lastIn] at the cut
+    const cutTieW=new Float64Array(N), cutTiePF=new Float64Array(N), cutN=new Float64Array(N);
+    // per-team win-out conditionals per open game & side: what to root for
+    const woG=new Float64Array(N*F*2), woGin=new Float64Array(N*F*2);
     const w=new Float64Array(N), ow=new Float64Array(N), order=new Int32Array(N);
+    const inSet=new Uint8Array(N);
     for(let m=0;m<total;m++){
       w.set(w0);
       for(let b=0;b<F;b++){ const g=G[free[b]]; if((m>>b)&1) w[g.a]++; else w[g.b]++; }
@@ -886,11 +909,28 @@ scatter("rangeQuad", DATA.rangeQuad, {
         while(j>=0){ const u=order[j];
           if((w[u]-w[v] || ow[u]-ow[v] || PF[u]-PF[v])<0){ order[j+1]=u; j--; } else break; }
         order[j+1]=v; }
-      for(let s=0;s<NP;s++){ const t=order[s]; inC[t]++; if(s<NB) byeC[t]++;
-        if((m&needSet[t])===needSet[t] && (m&needClear[t])===0) woIn[t]++; }
+      inSet.fill(0);
+      for(let s=0;s<NP;s++){ const t=order[s]; inSet[t]=1; inC[t]++; if(s<NB) byeC[t]++;
+        const lost=popcount((m&needClear[t])|(~m&needSet[t]));
+        if(lost>afford[t]) afford[t]=lost; }
+      const lastIn=order[NP-1], firstOut=order[NP];
+      rival[firstOut*N+lastIn]++; cutN[firstOut]++;
+      if(w[firstOut]===w[lastIn]){ cutTieW[firstOut]++; if(ow[firstOut]===ow[lastIn]) cutTiePF[firstOut]++; }
+      for(let t=0;t<N;t++){
+        if((m&needSet[t])===needSet[t] && (m&needClear[t])===0){
+          if(inSet[t]) woIn[t]++;
+          const base=t*F*2;
+          for(let b=0;b<F;b++){ const k=base+b*2+((m>>b)&1); woG[k]++; if(inSet[t]) woGin[k]++; }
+        }
+      }
     }
-    return {total, inP:i=>inC[i]/total, byeP:i=>byeC[i]/total,
-            woP:i=>woIn[i]/(total>>ownFree[i]) };
+    return {total, F, free, ownFree,
+            inP:i=>inC[i]/total, byeP:i=>byeC[i]/total,
+            woP:i=>woIn[i]/(total>>ownFree[i]),
+            afford:i=>afford[i],
+            rivalOf:i=>{ let best=-1,bc=0; for(let j=0;j<N;j++){ const c=rival[i*N+j]; if(c>bc){bc=c;best=j;} }
+                         return best<0?null:{j:best, share:bc/(cutN[i]||1), tieW:cutTieW[i]/(cutN[i]||1), tiePF:cutTiePF[i]/(cutN[i]||1)}; },
+            woCond:(i,b,side)=>{ const k=i*F*2+b*2+side; return woG[k]?woGin[k]/woG[k]:null; }};
   }
 
   function render(){
@@ -913,12 +953,25 @@ scatter("rangeQuad", DATA.rangeQuad, {
     });
     const res=compute();
     const tbl=document.getElementById("wifTable");
-    if(!res){ tbl.innerHTML=`<tbody><tr><td class="l wif-note">Too many open games to enumerate — pick a few winners first.</td></tr></tbody>`; return; }
+    const pathsBox=document.getElementById("wifPaths"), pathsHead=document.getElementById("wifPathsHead");
+    if(!res){ tbl.innerHTML=`<tbody><tr><td class="l wif-note">Too many open games to enumerate — pick a few winners first.</td></tr></tbody>`; pathsHead.hidden=true; pathsBox.innerHTML=""; return; }
+    const fmt=p=>p>=1?"100%":p<=0?"0%":(p*100).toFixed(p<0.1||p>0.99?1:0)+"%";
+    // record updated by the picks
+    const pw=new Int32Array(N), pl=new Int32Array(N);
+    state.forEach((s,gi)=>{ const g=G[gi];
+      if(s===1){pw[g.a]++; pl[g.b]++;} else if(s===2){pw[g.b]++; pl[g.a]++;} });
+    const recCell=i=>{ const p=(recOf[keys[i]]||"0-0").split("-").map(Number);
+      const t=p[2]?`-${p[2]}`:"";
+      if(!pw[i]&&!pl[i]) return `${p[0]}-${p[1]}${t}`;
+      return `${p[0]}-${p[1]}${t} <span style="color:var(--muted)">→</span> <b>${p[0]+pw[i]}-${p[1]+pl[i]}${t}</b>`; };
+    // opponents' wins and wins as of the current picks, for tiebreak prose
+    const wNow=Float64Array.from(baseW); for(let i=0;i<N;i++) wNow[i]+=pw[i];
+    const owNow=new Float64Array(N);
+    for(let i=0;i<N;i++){ let s=0; for(let j=0;j<N;j++) s+=OPP[i*N+j]*wNow[j]; owNow[i]=s; }
     const rows=keys.map((k,i)=>({k,i,in:res.inP(i),bye:res.byeP(i),wo:res.woP(i)}))
-      .sort((x,y)=> y.in-x.in || baseW[y.i]-baseW[x.i] || PF[y.i]-PF[x.i]);
+      .sort((x,y)=> y.in-x.in || wNow[y.i]-wNow[x.i] || PF[y.i]-PF[x.i]);
     tbl.innerHTML=`<thead><tr><th class="l">Team</th><th>Record</th><th>Playoffs</th><th>Bye</th><th>Win out</th><th class="l">The read</th></tr></thead>`;
     const tb=document.createElement("tbody");
-    const fmt=p=>p>=1?"100%":p<=0?"0%":(p*100).toFixed(p<0.1||p>0.99?1:0)+"%";
     for(const r of rows){
       const read = r.in>=1
           ? `<span class="badge in">Clinched</span>${r.bye>=1?" · bye locked":r.bye>0?` · ${fmt(r.bye)} for a bye`:""}`
@@ -928,15 +981,85 @@ scatter("rangeQuad", DATA.rangeQuad, {
         : `Win out → in ${fmt(r.wo)} of the rest — needs help`;
       const tr=document.createElement("tr");
       tr.innerHTML=`<td class="l"><span class="dot" style="background:${cv(r.k)}"></span>${nm(r.k)}</td>
-        <td>${recOf[r.k]||""}</td>
+        <td>${recCell(r.i)}</td>
         <td class="${r.in>=1?"pos":r.in<=0?"neg":""}">${fmt(r.in)}</td>
         <td>${fmt(r.bye)}</td><td>${fmt(r.wo)}</td>
         <td class="l wif-note">${read}</td>`;
       tb.appendChild(tr);
     }
     tbl.appendChild(tb);
+
+    /* -- plain-English paths for every team still genuinely on the bubble -- */
+    pathsBox.innerHTML="";
+    const bubble=rows.filter(r=>r.in>0&&r.in<1);
+    pathsHead.hidden=!bubble.length;
+    for(const r of bubble){
+      const i=r.i, bits=[];
+      const own=res.ownFree[i], a=res.afford(i);
+      if(own===0) bits.push(`done playing — fate rests entirely on other games`);
+      else if(a<=0) bits.push(`<b>must win out</b>${r.wo<1?` — and even that is only ${fmt(r.wo)}`:" — win out and they're in, no help needed"}`);
+      else bits.push(`can survive ${a} loss${a>1?"es":""} and still make it in some scenario`);
+      // rooting guide inside the win-out world
+      const needs=[], roots=[];
+      for(let b=0;b<res.F;b++){ const g=G[res.free[b]];
+        if(g.a===i||g.b===i) continue;
+        const pA=res.woCond(i,b,1), pB=res.woCond(i,b,0);
+        if(pA==null||pB==null) continue;
+        const wk=WI.games[res.free[b]].week, A=tshort(keys[g.a],14), B=tshort(keys[g.b],14);
+        if(pB<=0&&pA>0) needs.push(`<b>${A}</b> to beat ${B} (wk ${wk})`);
+        else if(pA<=0&&pB>0) needs.push(`<b>${B}</b> to beat ${A} (wk ${wk})`);
+        else if(Math.abs(pA-pB)>=0.25) roots.push({d:Math.abs(pA-pB), txt:`${pA>pB?A:B} over ${pA>pB?B:A} (wk ${wk})`});
+      }
+      if(needs.length) bits.push(`winning out, they also need ${needs.join(" and ")}`);
+      roots.sort((x,y)=>y.d-x.d);
+      if(roots.length) bits.push(`best things to root for: ${roots.slice(0,2).map(x=>x.txt).join(", ")}`);
+      // who the cut comes down to, and how the tie breaks
+      const rv=res.rivalOf(i);
+      if(rv&&rv.j!==i&&r.in<0.995){
+        const j=rv.j, R=tshort(keys[j],16);
+        let tb2=`the last spot most often comes down to <b>${R}</b>`;
+        if(rv.tieW>0.15){
+          tb2+=` — a record tie breaks on opponents' wins (${owNow[i]} vs ${owNow[j]} as picked)`;
+          if(rv.tiePF>0.05){
+            const gap=Math.abs(PF[i]-PF[j]).toFixed(1);
+            tb2+= PF[i]>PF[j]
+              ? `, then total points, where they hold a ${gap}-point cushion (${PF[i]} vs ${PF[j]})`
+              : `, then total points, where they'd need to outscore ${R} by ${gap} the rest of the way (${PF[i]} vs ${PF[j]})`;
+          }
+        }
+        bits.push(tb2);
+      }
+      const d=document.createElement("div"); d.className="wif-path";
+      d.innerHTML=`<span class="dot" style="background:${cv(r.k)}"></span><b>${nm(r.k)}</b> (in ${fmt(r.in)} of scenarios): ${bits.join("; ")}.`;
+      pathsBox.appendChild(d);
+    }
   }
   render();
+})();
+
+/* ---- tabs: Film Room vs What-If Machine ----
+   Runs last so it can snapshot which sections hid themselves for lack of
+   data and restore exactly that state when switching back. */
+(function(){
+  const nav=document.getElementById("tabs"), wif=document.getElementById("wifSec");
+  if(!nav) return;
+  if(!(DATA.whatIf&&DATA.whatIf.games.length)) return;   // nothing to tab
+  nav.hidden=false;
+  const wrap=document.querySelector(".wrap");
+  const baseHidden=new Map();
+  for(const el of wrap.children) baseHidden.set(el, el.hidden);
+  function setTab(t){
+    for(const el of wrap.children){
+      if(el.tagName==="HEADER"||el===nav) continue;
+      if(el===wif) el.hidden = t==="whatif" ? baseHidden.get(el) : true;
+      else el.hidden = t==="whatif" ? true : baseHidden.get(el);
+    }
+    nav.querySelectorAll("button").forEach(b=>b.classList.toggle("on",b.dataset.tab===t));
+    try{ history.replaceState(null,"", t==="whatif"?"#whatif":location.pathname+location.search); }catch(e){}
+    window.scrollTo(0,0);
+  }
+  nav.querySelectorAll("button").forEach(b=>b.onclick=()=>setTab(b.dataset.tab));
+  setTab(location.hash==="#whatif"?"whatif":"film");
 })();
 </script>
 </body>
